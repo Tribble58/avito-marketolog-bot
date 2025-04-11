@@ -19,5 +19,5 @@ class ReplyState(StatesGroup):
     """
     Класс состояний ожидания ввода сообщений от пользователя
     """
-    waiting_for_new_template = State()
-    waiting_for_custom_message = State()
+    waiting_for_new_template: State = State()
+    waiting_for_custom_message: State = State()
