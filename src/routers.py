@@ -309,7 +309,6 @@ async def validate_custom_message(message: Message, state: FSMContext):
     )
     await message.answer(text=f"Вы уверены, что хотите оправить данное сообщение? \n{message.text}",
                          reply_markup=keyboard)
-    await state.clear()
 
 
 @router.callback_query(F.data.startswith("send_message"))
@@ -324,6 +323,8 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext):
         return
     chat_id = await state.get_value("chat_id")
     message = await state.get_value("message")
+
+    await state.clear()
 
     await avito_client.send_message(chat_id, message)
     await callback_query.message.answer(text=f"Сообщение \"{message}\" отправлено!")
