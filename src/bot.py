@@ -1,22 +1,44 @@
-from aiogram import F, Router
+import logging
+
+import asyncio
+from aiogram import F, Bot, Dispatcher
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message, BotCommand
 
 from avito import AvitoClient
-from config import ReplyState
+from config import ReplyState, Settings
 
-router = Router()
+# Включаем логирование, чтобы не пропустить важные сообщения
+logging.basicConfig(level=logging.INFO)
+
+tg_bot = Bot(token=Settings.bot_token)
+
+dp = Dispatcher()
 
 user_sessions = {}
 
 
-@router.message(Command("start"))
+async def set_menu_commands(bot: Bot):
+    """
+    Задает меню бота для навигации.
+    """
+    await bot.set_my_commands(
+        commands=
+        [
+            BotCommand(command="get_unread_messages", description="🍌Получить непрочитанные чаты"),
+            BotCommand(command="template_editor", description="🥭Редактор шаблонов"),
+            BotCommand(command="accounts_manager", description="🍉Управление аккаунтами"),
+            BotCommand(command="support", description="🍏Поддержка"),
+        ]
+    )
+
+
+@dp.message(Command("start"))
 async def start(message: Message):
     """
     Начальная команда.
     Регистрирует пользователя в сессиях.
-    :param message:
     """
     user_id = message.from_user.id
     avito_client = AvitoClient(telegram_user_id=user_id)
@@ -25,35 +47,37 @@ async def start(message: Message):
 
     await avito_client.run_session()
 
-    kb = [
-        [InlineKeyboardButton(text="Получить непрочитанные чаты", callback_data='get_unread_messages')],
-        [InlineKeyboardButton(text="Еще что-то (в разработке)", callback_data='something')],
-    ]
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=kb,
-        # Adjust button
-        resize_keyboard=True
-        # Hide button when pressed
-    )
-    await message.answer("Привет! Что сделать?", reply_markup=keyboard)
+    await message.answer(
+        "Привет! Выбери команды из списка кнопки Меню, или введи команду вручную. Вот список команд:\n\n"
+        "/get_unread_messages - 🍌Получить непрочитанные чаты\n"
+        "/template_editor - 🥭Открыть редактор шаблонов\n"
+        "/accounts_manager - 🍉Открыть управление аккаунтами\n"
+        "/support - 🍏Связаться с поддержкой")
 
 
-@router.callback_query(F.data == 'something')
+@dp.message(Command("accounts_manager"))
+async def accounts_manager(message: Message):
+    await message.answer(text="Здесь можно будет добавить аккаунт, удалить аккаунт и т.д.")
+
+
+@dp.message(Command("support"))
+async def support(message: Message):
+    await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
+
+
+@dp.callback_query(F.data == 'something')
 async def dummy(callback_query: CallbackQuery):
     await callback_query.message.answer(text="Отдыхай, кнопка в разработке... TUNG TUNG TUNG SAHUR")
     await callback_query.answer()
 
 
-@router.callback_query(F.data == "get_unread_messages")
-async def get_unread_chats(callback_query: CallbackQuery):
+@dp.message(Command("get_unread_messages"))
+async def get_unread_chats(message: Message):
     """
     Выводит чаты в инлайн кнопках.
     """
-    user_id = callback_query.from_user.id
+    user_id = message.from_user.id
     avito_client = user_sessions.get(user_id)
-    if not avito_client:
-        await callback_query.message.answer("Сначала воспользуйтесь /start.")
-        return
 
     chats_info = await avito_client.get_unread_chats_info()
 
@@ -66,13 +90,12 @@ async def get_unread_chats(callback_query: CallbackQuery):
             # Adjust button
             resize_keyboard=True,
         )
-        await callback_query.message.answer(text="Выберите чат:", reply_markup=keyboard)
-        await callback_query.answer()
+        await message.answer(text="Выберите чат:", reply_markup=keyboard)
     else:
-        await callback_query.message.answer(text=f"{chats_info}")
+        await message.answer(text=f"{chats_info}")
 
 
-@router.callback_query(F.data.startswith("chat_"))
+@dp.callback_query(F.data.startswith("chat_"))
 async def display_unread_messages(callback_query: CallbackQuery):
     """
     Выводит непрочитанные сообщения в инлайн кнопках.
@@ -99,7 +122,7 @@ async def display_unread_messages(callback_query: CallbackQuery):
     await callback_query.answer()
 
 
-@router.callback_query(F.data.startswith("message_"))
+@dp.callback_query(F.data.startswith("message_"))
 async def message_actions(callback_query: CallbackQuery, state: FSMContext):
     """
     Выводит опции ответа.
@@ -122,7 +145,7 @@ async def message_actions(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
 
 
-@router.callback_query(F.data == "choose_template_message")
+@dp.callback_query(F.data == "choose_template_message")
 async def choose_template_message(callback_query: CallbackQuery):
     """
     Выводит инлайн кнопки шаблонов сообщений.
@@ -138,7 +161,7 @@ async def choose_template_message(callback_query: CallbackQuery):
     kb = []
     for key, value in template_messages.items():
         kb.append([InlineKeyboardButton(text=value, callback_data=f"validate_template_message_{key}")])
-    kb.append([InlineKeyboardButton(text="Редактор шаблонов", callback_data=f"template_editor")])
+    kb.append([InlineKeyboardButton(text="Редактор шаблонов", callback_data="template_editor")])
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -150,7 +173,7 @@ async def choose_template_message(callback_query: CallbackQuery):
     await callback_query.answer()
 
 
-@router.callback_query(F.data.startswith("validate_template_message_"))
+@dp.callback_query(F.data.startswith("validate_template_message_"))
 async def validate_template_message(callback_query: CallbackQuery, state: FSMContext):
     """
     Валидация отправления шаблона сообщения.
@@ -182,16 +205,12 @@ async def validate_template_message(callback_query: CallbackQuery, state: FSMCon
     await callback_query.answer()
 
 
-@router.callback_query(F.data == "template_editor")
-async def edit_templates(callback_query: CallbackQuery):
+@dp.message(Command("template_editor"))
+async def edit_templates(message: Message):
     """
     Редактор шаблонов.
     """
-    user_id = callback_query.from_user.id
-    avito_client = user_sessions.get(user_id)
-    if not avito_client:
-        await callback_query.message.answer("Сначала воспользуйтесь /start.")
-        return
+
     kb = [
         [InlineKeyboardButton(text="Редактировать существующий шаблон", callback_data=f"show_templates_to_edit")],
         [InlineKeyboardButton(text="Создать новый шаблон", callback_data=f"get_new_template_from_user")],
@@ -201,12 +220,10 @@ async def edit_templates(callback_query: CallbackQuery):
         # Adjust button
         resize_keyboard=True
     )
-    await callback_query.message.answer(text="Выберите действие:",
-                                        reply_markup=keyboard)
-    await callback_query.answer()
+    await message.answer(text="Выберите действие:", reply_markup=keyboard)
 
 
-@router.callback_query(F.data == "show_templates_to_edit")
+@dp.callback_query(F.data == "show_templates_to_edit")
 async def show_templates_to_edit(callback_query: CallbackQuery):
     """
     Отображение шаблонов для изменения.
@@ -232,7 +249,7 @@ async def show_templates_to_edit(callback_query: CallbackQuery):
     await callback_query.answer()
 
 
-@router.callback_query(F.data.startswith("get_new_template_from_user"))
+@dp.callback_query(F.data.startswith("get_new_template_from_user"))
 async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMContext):
     """
     Получение нового шаблона от пользователя.
@@ -253,7 +270,7 @@ async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMCo
     await callback_query.answer()
 
 
-@router.message(ReplyState.waiting_for_new_template)
+@dp.message(ReplyState.waiting_for_new_template)
 async def create_new_template(message: Message, state: FSMContext):
     """
     Изменение шаблона.
@@ -281,7 +298,7 @@ async def create_new_template(message: Message, state: FSMContext):
     await state.clear()
 
 
-@router.callback_query(F.data.startswith("create_custom_message"))
+@dp.callback_query(F.data.startswith("create_custom_message"))
 async def create_custom_message(callback_query: CallbackQuery, state: FSMContext):
     """
     Ожидание кастомного сообщение от пользователя.
@@ -291,7 +308,7 @@ async def create_custom_message(callback_query: CallbackQuery, state: FSMContext
     await callback_query.answer()
 
 
-@router.message(ReplyState.waiting_for_custom_message)
+@dp.message(ReplyState.waiting_for_custom_message)
 async def validate_custom_message(message: Message, state: FSMContext):
     """
     Валидация кастомного сообщение от пользователя.
@@ -311,7 +328,7 @@ async def validate_custom_message(message: Message, state: FSMContext):
                          reply_markup=keyboard)
 
 
-@router.callback_query(F.data.startswith("send_message"))
+@dp.callback_query(F.data.startswith("send_message"))
 async def send_message(callback_query: CallbackQuery, state: FSMContext):
     """
     Отправка сообщения.
@@ -329,3 +346,43 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext):
     await avito_client.send_message(chat_id, message)
     await callback_query.message.answer(text=f"Сообщение \"{message}\" отправлено!")
     await callback_query.answer()
+
+
+@dp.message()
+async def process_other_text_answers(message: Message):
+    """
+    Обработка сообщений, не касающихся основных команд.
+    """
+    user_id = message.from_user.id
+    avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        await message.answer("Для начала работы введите /start")
+    else:
+        await message.answer("Для начала работы введите /start или выберите нужную команду из списка Меню")
+
+
+async def run_bot():
+    """
+    Запускает поллинг, задает меню.
+    """
+
+    await set_menu_commands(tg_bot)
+    await dp.start_polling(tg_bot)
+
+
+async def shutdown():
+    """
+    Закрывает HTTP-сессии для каждого пользователя.
+    """
+    print("Shutting down. Closing sessions...")
+
+    for client in user_sessions.values():
+        await client.close_session()
+    print("All sessions are closed.")
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(run_bot())
+    except (KeyboardInterrupt, SystemExit):
+        asyncio.run(shutdown())
