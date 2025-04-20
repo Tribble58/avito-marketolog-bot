@@ -1,16 +1,22 @@
 import logging
 
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+# Включаем логирование, чтобы не пропустить важные сообщения
+logging.basicConfig(level=logging.DEBUG,
+                    format="%(asctime)s - [%(levelname)s] -  %(name)s"
+                           "- (%(filename)s).%(funcName)s(%(lineno)d) - %(message)s")
+logger = logging.getLogger(__name__)
+
 import asyncio
 from aiogram import F, Bot, Dispatcher
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message, BotCommand
 
-from avito import AvitoClient
-from config import ReplyState, Settings
-
-# Включаем логирование, чтобы не пропустить важные сообщения
-logging.basicConfig(level=logging.INFO)
+from src.avito import AvitoClient
+from src.config import ReplyState, Settings
+from src.callbacks import ChatsCallbackFactory
 
 tg_bot = Bot(token=Settings.bot_token)
 
@@ -23,6 +29,7 @@ async def set_menu_commands(bot: Bot):
     """
     Задает меню бота для навигации.
     """
+    logger.debug("Создание меню...")
     await bot.set_my_commands(
         commands=
         [
@@ -32,6 +39,7 @@ async def set_menu_commands(bot: Bot):
             BotCommand(command="support", description="🍏Поддержка"),
         ]
     )
+    logger.debug("Меню создано!")
 
 
 @dp.message(Command("start"))
@@ -40,10 +48,13 @@ async def start(message: Message):
     Начальная команда.
     Регистрирует пользователя в сессиях.
     """
+    logger.debug("Стартовая команда")
     user_id = message.from_user.id
     avito_client = AvitoClient(telegram_user_id=user_id)
     if user_id not in user_sessions:
+        logger.debug("Пользователь не в сессиях")
         user_sessions[user_id] = avito_client
+        logger.debug("Пользователь зарегистрирован в сессиях!")
 
     await avito_client.run_session()
 
@@ -57,11 +68,22 @@ async def start(message: Message):
 
 @dp.message(Command("accounts_manager"))
 async def accounts_manager(message: Message):
+    user_id = message.from_user.id
+    avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        logger.debug("Пользователь не в сессиях")
+        await message.answer("Для начала работы введите /start")
+        return
     await message.answer(text="Здесь можно будет добавить аккаунт, удалить аккаунт и т.д.")
 
 
 @dp.message(Command("support"))
 async def support(message: Message):
+    user_id = message.from_user.id
+    avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        await message.answer("Для начала работы введите /start")
+        return
     await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
 
 
@@ -78,24 +100,26 @@ async def get_unread_chats(message: Message):
     """
     user_id = message.from_user.id
     avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        await message.answer("Для начала работы введите /start")
+        return
 
     chats_info = await avito_client.get_unread_chats_info()
 
     if isinstance(chats_info, list):
-
-        kb = [[InlineKeyboardButton(text=f"Чат с {chat["sender_name"]}", callback_data=f"chat_{chat["id"]}")]
-              for chat in chats_info]
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=kb,
-            # Adjust button
-            resize_keyboard=True,
-        )
-        await message.answer(text="Выберите чат:", reply_markup=keyboard)
+        builder = InlineKeyboardBuilder()
+        for chat in chats_info:
+            builder.button(
+                text=f"Чат с {chat["sender_name"]}",
+                callback_data=ChatsCallbackFactory(chat_id=chat["id"])
+            )
+        builder.adjust(1)
+        await message.answer(text="Выберите чат:", reply_markup=builder.as_markup())
     else:
         await message.answer(text=f"{chats_info}")
 
 
-@dp.callback_query(F.data.startswith("chat_"))
+@dp.callback_query(ChatsCallbackFactory.filter())
 async def display_unread_messages(callback_query: CallbackQuery):
     """
     Выводит непрочитанные сообщения в инлайн кнопках.
@@ -105,7 +129,7 @@ async def display_unread_messages(callback_query: CallbackQuery):
     if not avito_client:
         await callback_query.message.answer("Сначала воспользуйтесь /start.")
         return
-    chat_id = callback_query.data.split("_")[1]
+    chat_id = callback_query.data.split(":")[1]
 
     messages_info = await avito_client.get_unread_messages(chat_id)
 
@@ -367,6 +391,8 @@ async def run_bot():
     """
 
     await set_menu_commands(tg_bot)
+    # Пропуск апдейтов, которые были отправлены во время отключения бота
+    await tg_bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(tg_bot)
 
 
