@@ -14,6 +14,13 @@ class Settings:
     client_id: str = os.getenv("AVITO_CLIENT_ID")
     client_secret: str = os.getenv("AVITO_CLIENT_SECRET")
     bot_token: str = os.getenv("TG_BOT_TOKEN")
+    db_host: str = os.getenv("PG_HOST")
+    db_port: str = os.getenv("PG_PORT")
+    db_name: str = os.getenv("PG_DATABASE")
+    db_user: str = os.getenv("PG_USER")
+    db_password: str = os.getenv("PG_PASSWORD")
+    db_connection_uri: str = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
 
 class ReplyState(StatesGroup):
     """
