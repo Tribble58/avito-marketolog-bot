@@ -1,25 +1,27 @@
 import aiohttp
+import logging
+from src.config import Settings
 
-from config import Settings
+logger = logging.getLogger(__name__)
 
 
-class AvitoClient:
+class AvitoUser:
     """
     Класс, реализующий логику взаимодействия с API Авито, а также хранящий параметры подключения и т.д.
     """
 
-    def __init__(self, telegram_user_id):
+    def __init__(self):
         self.client_id = Settings.client_id
         self.client_secret = Settings.client_secret
         self.token = None
-        self.user_id = None
+        self.avito_id = None
         self.session = aiohttp.ClientSession()
         self.base_url = "https://api.avito.ru"
         self.templates = {
             0: "Товар продан!",
             1: "Цену и остальную актуальную информацию смотрите на сайте www.xyz.ru"
         }
-        self.telegram_user_id = None
+        logger.debug("Пользователь создан!")
 
     async def run_session(self):
 
@@ -48,8 +50,9 @@ class AvitoClient:
         async with self.session.post(self.base_url + "/token", data=payload, headers=headers) as response:
             if response.status == 200:
                 self.token = (await response.json())["access_token"]
-                print(f"Токен получен: {self.token[:10]}...")
+                logger.info(f"Токен получен: {self.token[:10]}...")
             else:
+                logger.exception(f"Ошибка получения токена: {response.status} - {await response.text()}")
                 raise Exception(f"Ошибка получения токена: {response.status} - {await response.text()}")
 
     async def get_user_id(self):
@@ -59,6 +62,7 @@ class AvitoClient:
         """
 
         if not self.token:
+            logger.error("Ошибка: токен не получен!")
             raise Exception("Ошибка: токен не получен!")
 
         headers = {
@@ -67,12 +71,13 @@ class AvitoClient:
 
         async with self.session.get(self.base_url + "/core/v1/accounts/self", headers=headers) as response:
             if response.status == 200:
-                self.user_id = (await response.json())["id"]
-                print(f"user_id получен: {self.user_id}")
+                self.avito_id = (await response.json())["id"]
+                logger.info(f"user_id получен: {self.avito_id}")
             else:
+                logger.exception(f"Ошибка получения user_id: {response.status} - {await response.text()}")
                 raise Exception(f"Ошибка получения user_id: {response.status} - {await response.text()}")
 
-    async def get_unread_chats_info(self):
+    async def get_unread_chats(self):
         """
         Получение чатов с непрочитанными сообщениями
         :return: chats_info
@@ -86,14 +91,14 @@ class AvitoClient:
             "unread_only": "true"
         }
 
-        async with self.session.get(self.base_url + f"/messenger/v2/accounts/{self.user_id}/chats", headers=headers,
+        async with self.session.get(self.base_url + f"/messenger/v2/accounts/{self.avito_id}/chats", headers=headers,
                                     params=params) as response:
             if response.status == 200:
 
                 if len((await response.json())["chats"]) > 0:
 
                     chats_info = []
-                    print(f"Непрочитанных чатов: {len((await response.json())["chats"])}")
+                    logger.info(f"Получено непрочитанных чатов: {len((await response.json())["chats"])}")
 
                     # Вывести последние 3 чата
                     limit = 3
@@ -101,7 +106,7 @@ class AvitoClient:
                     for chat in (await response.json())["chats"]:
                         chat_id = chat["id"]
                         for k in range(len(chat["users"])):
-                            if chat["users"][k]["id"] != self.user_id:
+                            if chat["users"][k]["id"] != self.avito_id:
                                 sender_id = chat["users"][k]["id"]
                                 sender_name = chat["users"][k]["name"]
 
@@ -117,9 +122,10 @@ class AvitoClient:
                     return chats_info
 
                 else:
-                    return "Непрочитанных чатов нет!"
+                    logger.info("Непрочитанных чатов нет!")
 
             else:
+                logger.exception(f"Ошибка получения чатов: {response.status} - {await response.text()}")
                 raise Exception(f"Ошибка получения чатов: {response.status} - {await response.text()}")
 
     async def get_unread_messages(self, chat_id):
@@ -132,7 +138,7 @@ class AvitoClient:
             "Authorization": f"Bearer {self.token}"
         }
 
-        async with self.session.get(self.base_url + f"/messenger/v3/accounts/{self.user_id}/chats/{chat_id}/messages",
+        async with self.session.get(self.base_url + f"/messenger/v3/accounts/{self.avito_id}/chats/{chat_id}/messages",
                                     headers=headers) as response:
             if response.status == 200:
 
@@ -144,8 +150,11 @@ class AvitoClient:
                         "text"]  # TODO: схема разная на разный тип отправляемого сообщения, дополнить тут впоследствии
                     messages_info.append(message_text)
 
+                logger.info("Информация о чатах успешно получена!")
                 return messages_info
             else:
+                logger.exception(
+                    f"Ошибка получения сообщений с чатом {chat_id}: {response.status} - {await response.text()}")
                 raise Exception(
                     f"Ошибка получения сообщений с чатом {chat_id}: {response.status} - {await response.text()}")
 
@@ -167,11 +176,15 @@ class AvitoClient:
             "type": "text"
         }
 
-        async with self.session.post(self.base_url + f"/messenger/v1/accounts/{self.user_id}/chats/{chat_id}/messages/",
-                                     headers=headers, json=payload) as response:
+        logger.info("Сообщение успешно отправлено!")
+
+        async with self.session.post(
+                self.base_url + f"/messenger/v1/accounts/{self.avito_id}/chats/{chat_id}/messages/",
+                headers=headers, json=payload) as response:
             if response.status == 200:
-                print("Сообщение успешно отправлено!")
+                logger.info("Сообщение успешно отправлено!")
             else:
+                logger.exception(f"Ошибка отправки сообщения: {response.status} - {await response.text()}")
                 raise Exception(f"Ошибка отправки сообщения: {response.status} - {await response.text()}")
 
     async def add_template(self, new_template):
@@ -181,6 +194,7 @@ class AvitoClient:
         """
         templates_length = len(self.templates.values())
         self.templates[templates_length] = new_template
+        logger.info("Шаблон успешно добавлен!")
 
     async def edit_template(self, template_id, new_template):
         """
@@ -189,10 +203,11 @@ class AvitoClient:
         new_template: шаблон
         """
         self.templates[template_id] = new_template
+        logger.info("Шаблон успешно изменен!")
 
     async def close_session(self):
         """
         Закрытие HTTP-сессии
         """
         await self.session.close()
-        print(f"Session for user {self.user_id} is closed!")
+        logger.info(f"Сессия для пользователя {self.avito_id} закрыта!")

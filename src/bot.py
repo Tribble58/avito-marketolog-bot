@@ -1,0 +1,325 @@
+import logging
+
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.exc import IntegrityError
+
+from src.database import PostgresDatabase
+
+logger = logging.getLogger(__name__)
+
+from aiogram import F, Router
+from aiogram.filters.command import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
+
+from src.avito import AvitoUser
+from src.config import ReplyState
+from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory
+
+commands_router = Router()
+router = Router()
+
+@commands_router.message(Command("start"))
+async def start(message: Message):
+    """
+    Начальная команда.
+    """
+    logger.debug("Стартовая команда")
+
+    await message.answer(
+        "Привет! Выбери команды из списка кнопки Меню, или введи команду вручную. Вот список команд:\n\n"
+        "/get_unread_messages - 🍌Получить непрочитанные чаты\n"
+        "/templates_editor - 🥭Открыть редактор шаблонов\n"
+        "/accounts_manager - 🍉Открыть управление аккаунтами\n"
+        "/support - 🍏Связаться с поддержкой\n"
+        "/something - ⚙️Че-то")
+
+
+@commands_router.message(Command("accounts_manager"))
+async def accounts_manager(message: Message, user_sessions: dict):
+    user_id = message.from_user.id
+    avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        logger.debug("Пользователь не в сессиях")
+        await message.answer("Для начала работы введите /start")
+        return
+    await message.answer(text="Здесь можно будет добавить аккаунт, удалить аккаунт и т.д.")
+
+
+@commands_router.message(Command("support"))
+async def support(message: Message, user_sessions: dict):
+    user_id = message.from_user.id
+    avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        await message.answer("Для начала работы введите /start")
+        return
+    await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
+
+
+@commands_router.message(Command("something"))
+async def dummy(callback_query: CallbackQuery, db: PostgresDatabase):
+    # user_id = callback_query.from_user.id
+    # await db.add_tg_user(telegram_id=user_id)
+    await callback_query.answer(text="Отдыхай, кнопка в разработке... TUNG TUNG TUNG SAHUR")
+    # await callback_query.answer()
+
+
+@router.message(Command("get_unread_messages"))
+async def get_unread_chats(message: Message, avito_user: AvitoUser):
+    chats = await avito_user.get_unread_chats()
+
+    if chats:
+        builder = InlineKeyboardBuilder()
+        for chat in chats:
+            builder.button(
+                text=f"Чат с {chat["sender_name"]}",
+                callback_data=ChatsCallbackFactory(chat_id=chat["id"])
+            )
+        # One chat per row
+        builder.adjust(1)
+        await message.answer(text="Выберите чат:", reply_markup=builder.as_markup())
+    else:
+        await message.answer(text=f"Непрочитанных чатов нет!")
+
+
+@router.callback_query(ChatsCallbackFactory.filter())
+async def display_unread_messages(callback_query: CallbackQuery, avito_user: AvitoUser):
+    """
+    Выводит непрочитанные сообщения в инлайн кнопках.
+    """
+    chat_id = callback_query.data.split(":")[1]
+
+    messages = await avito_user.get_unread_messages(chat_id)
+
+    if messages:
+        builder = InlineKeyboardBuilder()
+        for message in messages:
+            builder.button(
+                text=f"{message}",
+                callback_data=MessagesCallbackFactory(chat_id=chat_id)
+            )
+        # One chat per row
+        builder.adjust(1)
+        await callback_query.message.answer(text="Выберите сообщение:", reply_markup=builder.as_markup())
+    else:
+        # Impossible, but still...
+        await callback_query.message.answer(text=f"Непрочитанных сообщений нет!")
+    await callback_query.answer()
+
+
+@router.callback_query(MessagesCallbackFactory.filter())
+async def message_actions(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Выводит опции ответа.
+    """
+    chat_id = callback_query.data.split(":")[1]
+
+    kb = [
+        [InlineKeyboardButton(text="Ответить шаблонным сообщением", callback_data=f"choose_template_message")],
+        [InlineKeyboardButton(text="Ответить другим сообщением", callback_data=f"create_custom_message")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+
+    await state.update_data(chat_id=chat_id)
+
+    await callback_query.message.answer(text="Выберите, как ответить:", reply_markup=keyboard)
+    await callback_query.answer()
+
+
+@router.callback_query(F.data == "choose_template_message")
+async def choose_template_message(callback_query: CallbackQuery, db: PostgresDatabase):
+    """
+    Выводит инлайн кнопки шаблонов сообщений.
+    Ведет на редактор шаблонов.
+    """
+    tg_id = callback_query.from_user.id
+    templates = await db.get_templates(tg_id=tg_id)
+
+    if templates:
+        builder = InlineKeyboardBuilder()
+        for template_text, template_id in templates:
+            builder.button(
+                text=f"{template_text}",
+                callback_data=TemplatesCallbackFactory(template_text=template_text)
+            )
+        # One chat per row
+        builder.adjust(1)
+        await callback_query.message.answer(text="Выберите шаблон для ответа:", reply_markup=builder.as_markup())
+    else:
+        await callback_query.message.answer(text=f"Шаблонов нет!\nПерейти к редактору шаблонов /templates_editor")
+    await callback_query.answer()
+
+
+@router.callback_query(TemplatesCallbackFactory.filter())
+async def validate_template_message(callback_query: CallbackQuery, state: FSMContext, user_sessions: dict):
+    """
+    Валидация отправления шаблона сообщения.
+    """
+
+    template_text = callback_query.data.split(":")[1]
+
+    await state.update_data(message=template_text)
+
+    kb = [
+        [InlineKeyboardButton(text="Да, отправить данный шаблон сообщения", callback_data=f"send_message")],
+        [InlineKeyboardButton(text="Нет, выбрать другой шаблон сообщения", callback_data=f"choose_template_message")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+
+    await callback_query.message.answer(
+        text=f"Вы уверены, что хотите оправить данное сообщение? \n\n\"{template_text}\"",
+        reply_markup=keyboard)
+    await callback_query.answer()
+
+
+@router.message(Command("templates_editor"))
+async def edit_templates(message: Message):
+    """
+    Редактор шаблонов.
+    """
+    kb = [
+        [InlineKeyboardButton(text="Создать новый шаблон", callback_data=f"get_new_template_from_user")],
+        [InlineKeyboardButton(text="Редактировать существующий шаблон", callback_data=f"show_templates_to_edit")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+    await message.answer(text="Выберите действие:", reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "show_templates_to_edit")
+async def show_templates_to_edit(callback_query: CallbackQuery, db: PostgresDatabase):
+    """
+    Отображение шаблонов для изменения.
+    """
+    tg_id = callback_query.from_user.id
+    templates = await db.get_templates(tg_id=tg_id)
+
+    kb = []
+    # for key, value in template_messages.items():
+    for template_text, template_id in templates:
+        kb.append([InlineKeyboardButton(text=template_text,
+                                        callback_data=f"get_new_template_from_user|{template_id}"
+                                        # TODO: replace with CallbacksFactory
+                                        )
+                   ]
+                  )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+
+    await callback_query.message.answer(text="Выберите шаблон для изменения:", reply_markup=keyboard)
+    await callback_query.answer()
+
+
+@router.callback_query(F.data.startswith("get_new_template_from_user"))
+async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Получение нового шаблона от пользователя.
+    """
+    if callback_query.data != 'get_new_template_from_user':
+        # Add template id to state if template is to be updated further
+        template_id = int(callback_query.data.split('|')[-1])
+        await state.update_data(template_id=template_id)
+
+    await callback_query.message.answer(text="Введите новый шаблон:")
+    await state.set_state(ReplyState.waiting_for_new_template)
+    await callback_query.answer()
+
+
+@router.message(ReplyState.waiting_for_new_template)
+async def create_new_template(message: Message, state: FSMContext, db: PostgresDatabase):
+    """
+    Изменение шаблона.
+    """
+    tg_id = message.from_user.id
+    new_template = message.text
+
+    template_id = await state.get_value("template_id")
+
+    # Update template if template_id is not None else add new template
+    if template_id:
+        await db.update_template(tg_id=tg_id, template_id=template_id, new_template=new_template)
+        await message.answer(text="Шаблон успешно изменен!\nК редактору шаблонов /templates_editor")
+    else:
+        try:
+            await db.add_template(tg_id=tg_id, new_template=new_template)
+            await message.answer(text="Шаблон успешно создан!\nК редактору шаблонов /templates_editor")
+        except IntegrityError as e:
+            logger.error(f"{e}")
+            await db.close()
+            await message.answer(text="Для добавления шаблона сначала нажмите /start!")
+
+    await state.clear()
+
+
+@router.callback_query(F.data.startswith("create_custom_message"))
+async def create_custom_message(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Ожидание кастомного сообщение от пользователя.
+    """
+    await callback_query.message.answer(text="Введите сообщение ниже:")
+    await state.set_state(ReplyState.waiting_for_custom_message)
+    # await callback_query.answer()
+
+
+@router.message(ReplyState.waiting_for_custom_message)
+async def validate_custom_message(message: Message, state: FSMContext):
+    """
+    Валидация кастомного сообщение от пользователя.
+    """
+    await state.update_data(message=message.text)
+
+    kb = [
+        [InlineKeyboardButton(text="Да, отправить данное сообщение", callback_data=f"send_message")],
+        [InlineKeyboardButton(text="Нет, создать другое сообщение", callback_data=f"create_custom_message")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+    await message.answer(text=f"Вы уверены, что хотите оправить данное сообщение? \n{message.text}",
+                         reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "send_message")
+async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_user: AvitoUser):
+    """
+    Отправка сообщения.
+    """
+
+    chat_id = await state.get_value("chat_id")
+    message = await state.get_value("message")
+
+    await avito_user.send_message(chat_id, message)
+    # Clear chat_id and message from state
+    await state.clear()
+    await callback_query.message.answer(text=f"Сообщение \"{message}\" отправлено!")
+    await callback_query.answer()
+
+
+@router.message()
+async def process_other_text_answers(message: Message, user_sessions: dict):
+    """
+    Обработка сообщений, не касающихся основных команд.
+    """
+    user_id = message.from_user.id
+    avito_client = user_sessions.get(user_id)
+    if not avito_client:
+        await message.answer("Для начала работы введите /start")
+    else:
+        await message.answer("Для начала работы введите /start или выберите нужную команду из списка Меню")
