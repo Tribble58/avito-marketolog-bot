@@ -14,6 +14,7 @@ class Settings:
     client_id: str = os.getenv("AVITO_CLIENT_ID")
     client_secret: str = os.getenv("AVITO_CLIENT_SECRET")
     bot_token: str = os.getenv("TG_BOT_TOKEN")
+    notifications_bot_token: str = os.getenv("TG_BOT_NOTIFICATIONS_TOKEN")
     db_host: str = os.getenv("PG_HOST")
     db_port: str = os.getenv("PG_PORT")
     db_name: str = os.getenv("PG_DATABASE")
@@ -26,5 +27,6 @@ class ReplyState(StatesGroup):
     """
     Класс состояний ожидания ввода сообщений от пользователя
     """
+    waiting_for_client_secrets: State = State()
     waiting_for_new_template: State = State()
     waiting_for_custom_message: State = State()

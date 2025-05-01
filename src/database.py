@@ -1,11 +1,11 @@
 import logging
 from typing import Tuple, List
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from src.config import Settings
-from src.models import Base, User, UserTemplate
+from src.models import Base, User, UserTemplate, Account
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ class PostgresDatabase:
     async def init_models(self):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            logger.info("Таблицы созданы!")
 
     async def get_session(self) -> AsyncSession:
         """
@@ -47,7 +48,7 @@ class PostgresDatabase:
         else:
             logger.info(f"User {tg_id} does not exist.")
 
-    async def set_user(self, tg_id: int):
+    async def insert_user(self, tg_id: int):
         """
         Adds new user to users table
         :param tg_id: 
@@ -65,7 +66,7 @@ class PostgresDatabase:
         session.add(user)
         await session.commit()
         await session.refresh(user)
-        logger.info(f"Added new user {tg_id} to database.")
+        logger.info(f"Added new user {tg_id} to database!")
 
     async def get_avito_id(self, tg_id):
         """
@@ -86,7 +87,7 @@ class PostgresDatabase:
         else:
             logger.info(f"User {tg_id} has no AVITO id!")
 
-    async def set_avito_id(self, tg_id, avito_id):
+    async def insert_avito_id(self, tg_id, avito_id):
         """
         Updates user avito_id field of users table
         :param tg_id:
@@ -103,6 +104,124 @@ class PostgresDatabase:
         # await session.refresh(user)
 
         logger.info(f"Added AVITO id to user {tg_id}!")
+
+    async def get_account_id(self, tg_id, avito_id):
+        """
+        Gets id of account from accounts table
+        :param user_id: id of user in users table
+        :param avito_id: id of client in AVITO
+        :return: int | None
+        """
+        session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
+        result = await session.execute(
+            select(Account.id)
+            .select_from(Account)
+            .where(
+                (Account.user_id == user_id)
+                & (Account.avito_id == avito_id)
+            )
+        )
+        account_id = result.scalar_one_or_none()
+        return account_id
+
+    async def insert_account(self, tg_id, avito_id, name, number, client_id, client_secret):
+        """
+        Adds account to accounts table
+        :param tg_id: id of user in users table
+        :param avito_id: id of client in AVITO
+        :param number: name of client in AVITO
+        :param name: phone number of client in AVITO
+        :param client_id: client_id of client in AVITO
+        :param client_secret: client_secret of client in AVITO
+        :return:
+        """
+        session = await self.get_session()
+
+        # Check that client does not exist
+        account_id = await self.get_account_id(tg_id=tg_id, avito_id=avito_id)
+        if account_id:
+            logger.debug(f"Account {avito_id} of user {tg_id} already exists!")
+            return
+
+        user_id = await self.get_user_id(tg_id=tg_id)
+        account = Account(user_id=user_id, avito_id=avito_id, name=name, number=number, client_id=client_id, client_secret=client_secret)
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+        logger.info(f"Added new account {avito_id} for user {tg_id} to database!")
+
+    async def get_accounts(self, tg_id):
+        """
+        Gets AVITO accounts connected to provided user_id
+        :param tg_id:
+        :return:
+        """
+        session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
+        result = await session.execute(
+            select(
+                Account.name,
+                Account.number
+            )
+            .select_from(Account)
+            .where(Account.user_id == user_id)
+        )
+        accounts = result.fetchall()
+        return accounts
+
+    async def delete_account(self, tg_id, number):
+        """
+        Deletes account
+        :param tg_id:
+        :param number:
+        :return:
+        """
+        session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
+        deleted_rows = await session.execute(
+            delete(Account).where(
+                (Account.user_id == user_id)
+                & (Account.number == number))
+        )
+        await session.commit()
+
+    async def get_clients_secrets(self, tg_id):
+        """
+        Gets clients secret ids and keys
+        :param tg_id:
+        :return:
+        """
+
+        session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
+        result = await session.execute(
+            select(
+                Account.client_id,
+                Account.client_secret
+            )
+            .select_from(Account)
+            .where(Account.user_id == user_id)
+        )
+        secrets = result.fetchall()
+        return secrets
+
+    async def get_tg_id_by_account(self, avito_id):
+        """
+        Gets id of user in Telegram by user`s client
+        :param avito_id:
+        :return: tg_id:
+        """
+        session = await self.get_session()
+        user_id = select(Account.user_id).where(Account.avito_id == avito_id).scalar_subquery()
+        logger.debug(f"user_id: {user_id}")
+        result = await session.execute(
+            select(User.tg_id)
+            .select_from(User)
+            .where(User.id == user_id)
+        )
+        tg_id = result.scalar_one_or_none()
+        return tg_id
 
     async def get_templates(self, tg_id: int) -> List[Tuple[str, int]]:
         """

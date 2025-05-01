@@ -1,0 +1,79 @@
+import logging
+
+import aiohttp
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery
+
+from src.avito import AvitoClient
+from src.database import PostgresDatabase
+
+logger = logging.getLogger(__name__)
+
+router_notifications = Router()
+
+"""
+This bot acts as a receiver of notifications that Avito server sends to our server by webhook.
+It contains several commands represented in menu that basically implement subscription/unsubscription functions. 
+"""
+
+@router_notifications.message(Command("start"))
+async def start(message: Message):
+    """
+    Start command with available options
+    :param message:
+    :return:
+    """
+    logger.debug("Стартовая команда")
+
+    await message.answer("Это бот для подписки на уведомления. Вот список команд:\n\n"
+                         "🔔/subscribe, чтобы подписаться на уведомления клиентов, которые Вы подключили в модуле управления аккаунтами\n"
+                         "🔕/unsubscribe, чтобы отписаться от уведомлений клиентов, которые Вы подключили в модуле управления аккаунтами")
+
+
+@router_notifications.message(Command("subscribe"))
+async def subscribe_to_notifications(message: Message, db: PostgresDatabase, server_url: str):
+    """
+    Gets account token by secrets and subscribes for its notifications
+    :param message:
+    :param db:
+    :param server_url:
+    :return:
+    """
+    tg_id = message.from_user.id
+
+    secrets = await db.get_clients_secrets(tg_id=tg_id)
+    for (client_id, client_secret) in secrets:
+        avito_client = AvitoClient()
+        await avito_client.set_client_id(client_id=client_id)
+        await avito_client.set_client_secret(client_secret=client_secret)
+        await avito_client.get_token()
+        logger.info(f"Клиент успешно найден!")
+        await avito_client.subscribe_to_notifications(server_url=server_url)
+        await avito_client.close_session()
+
+    await message.answer("Вы подписаны на все уведомления!")
+
+
+@router_notifications.message(Command("unsubscribe"))
+async def unsubscribe_from_notifications(message: Message, db: PostgresDatabase, server_url: str):
+    """
+    Gets account token by secrets and unsubscribes from any notifications
+    :param message:
+    :param db:
+    :param server_url:
+    :return:
+    """
+    tg_id = message.from_user.id
+
+    secrets = await db.get_clients_secrets(tg_id=tg_id)
+    for (client_id, client_secret) in secrets:
+        avito_client = AvitoClient()
+        await avito_client.set_client_id(client_id=client_id)
+        await avito_client.set_client_secret(client_secret=client_secret)
+        await avito_client.get_token()
+        logger.info(f"Клиент успешно найден!")
+        await avito_client.unsubscribe_to_notifications(server_url=server_url)
+        await avito_client.close_session()
+
+    await message.answer("Вы отписаны от всех уведомлений!")

@@ -12,17 +12,29 @@ from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 
-from src.avito import AvitoUser
+from src.avito import AvitoClient
 from src.config import ReplyState
-from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory
+from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory, \
+    AccountsCallbackFactory
+
+"""
+This main bot implements basic logic of User interaction with its Accounts.
+All available commands are presented in the menu and in /start command.
+
+Glossary:
+    User is a person who manages several accounts, user is always considered in the Telgram context.
+    Account is a client (shop, private person, seller, etc) that provides any kind of services in Avito and pays User for
+    his/her account promotion.
+"""
 
 commands_router = Router()
 router = Router()
 
+
 @commands_router.message(Command("start"))
 async def start(message: Message):
     """
-    Начальная команда.
+    Start message with menu.
     """
     logger.debug("Стартовая команда")
 
@@ -36,18 +48,150 @@ async def start(message: Message):
 
 
 @commands_router.message(Command("accounts_manager"))
-async def accounts_manager(message: Message, user_sessions: dict):
-    user_id = message.from_user.id
-    avito_client = user_sessions.get(user_id)
-    if not avito_client:
-        logger.debug("Пользователь не в сессиях")
-        await message.answer("Для начала работы введите /start")
-        return
-    await message.answer(text="Здесь можно будет добавить аккаунт, удалить аккаунт и т.д.")
+async def accounts_manager(message: Message):
+    """
+    Account manager module that is responsible for user interactions with managed Avito accounts
+    :param message:
+    :return:
+    """
+    kb = [
+        [InlineKeyboardButton(text="Подключить аккаунт", callback_data="wait_for_client_secrets")],
+        [InlineKeyboardButton(text="Отключить аккаунт", callback_data="list_accounts")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+
+    await message.answer(text="Что сделать?", reply_markup=keyboard)
+    # TODO: сделать чтобы кнопка не светилась после нажатия
+
+
+@router.callback_query(F.data == "wait_for_client_secrets")
+async def wait_for_client_secrets(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Waits for user input and sends it to validation
+    :param callback_query:
+    :param state:
+    :return:
+    """
+    await callback_query.message.answer(text="Введите client_id и client_secret аккаунта, который хотите подключить.\n"
+                                             "Формат ввода: client_id:client_secret\n"
+                                             "Пример: 54AZwJISvjVDasqDC13:ZzRUHTgoHMo5MtooCRuEIoa48Nv3pha12f23evwqq")
+    await state.set_state(ReplyState.waiting_for_client_secrets)
+
+
+@router.message(ReplyState.waiting_for_client_secrets)
+async def validate_connect_account(message: Message, state: FSMContext):
+    """
+    Checks that client with provided secret keys exists in Avito, gets his info and displays to user
+    :param message:
+    :param state:
+    :return:
+    """
+    client_id, client_secret = message.text.split(":")[0], message.text.split(":")[1]
+
+    avito_client = AvitoClient()
+    await avito_client.set_client_id(client_id=client_id)
+    await avito_client.set_client_secret(client_secret=client_secret)
+    if not await avito_client.validate_avito_client():
+        await message.answer("Аккаунта не существует! Проверьте client_id и client_secret и попробуйте заново!")
+
+    await avito_client.run_session()
+    name, number = await avito_client.get_avito_client_info()
+    await avito_client.set_name(name=name)
+    await avito_client.set_number(number=number)
+
+    kb = [
+        [InlineKeyboardButton(text="Да, подключить аккаунт", callback_data="connect_account")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+
+    await message.answer(text="Вы уверены, что хотите добавить данный аккаунт?\n"
+                              f"Имя аккаунта: {name}\n"
+                              f"Телефон: {number}\n",
+                         reply_markup=keyboard)
+    await state.update_data(avito_client=avito_client)
+
+
+@router.callback_query(F.data == "connect_account")
+async def connect_account(callback_query: CallbackQuery, db: PostgresDatabase, state: FSMContext):
+    """
+    Connects account to user
+    :param callback_query:
+    :param db:
+    :param state:
+    :return:
+    """
+    tg_id = callback_query.from_user.id
+    avito_client: AvitoClient = await state.get_value("avito_client")
+    avito_id = await avito_client.get_avito_id()
+    name, number, client_id, client_secret = (await avito_client.get_name(),
+                                              await avito_client.get_number(),
+                                              await avito_client.get_client_id(),
+                                              await avito_client.get_client_secret())
+
+    await db.insert_account(tg_id=tg_id, avito_id=avito_id, name=name, number=number, client_id=client_id,
+                            client_secret=client_secret)
+    await callback_query.message.answer(text="Аккаунт успешно добавлен!\n"
+                                             "К управлению аккаунтами /accounts_manager")
+
+
+@router.callback_query(F.data == "list_accounts")
+async def list_accounts(callback_query: CallbackQuery, db: PostgresDatabase):
+    """
+    Lists all available account that user connected
+    :param callback_query:
+    :param db:
+    :return:
+    """
+    tg_id = callback_query.from_user.id
+    accounts = await db.get_accounts(tg_id=tg_id)
+
+    if accounts:
+        builder = InlineKeyboardBuilder()
+        for name, number in accounts:
+            builder.button(
+                text=f"Имя аккаунта: {name},"
+                     f"номер: {number}",
+                callback_data=AccountsCallbackFactory(number=number)
+            )
+        # One account per row
+        builder.adjust(1)
+        await callback_query.message.answer(text="Выберите аккаунт:", reply_markup=builder.as_markup())
+    else:
+        await callback_query.message.answer(text=f"Нет подключенных аккаунтов!")
+
+
+@router.callback_query(AccountsCallbackFactory.filter())
+async def disconnect_account(callback_query: CallbackQuery, db: PostgresDatabase):
+    """
+    Disconnects account from user
+    :param callback_query:
+    :param db:
+    :return:
+    """
+    tg_id = callback_query.from_user.id
+    number = callback_query.data.split(":")[1]
+
+    await db.delete_account(tg_id=tg_id, number=number)
+    await callback_query.message.answer(text=f"Аккаунт успешно удален!")
+    pass
 
 
 @commands_router.message(Command("support"))
 async def support(message: Message, user_sessions: dict):
+    """
+    Auxiliary command for connecting admins
+    :param message:
+    :param user_sessions:
+    :return:
+    """
     user_id = message.from_user.id
     avito_client = user_sessions.get(user_id)
     if not avito_client:
@@ -58,6 +202,12 @@ async def support(message: Message, user_sessions: dict):
 
 @commands_router.message(Command("something"))
 async def dummy(callback_query: CallbackQuery, db: PostgresDatabase):
+    """
+    Dummy
+    :param callback_query:
+    :param db:
+    :return:
+    """
     # user_id = callback_query.from_user.id
     # await db.add_tg_user(telegram_id=user_id)
     await callback_query.answer(text="Отдыхай, кнопка в разработке... TUNG TUNG TUNG SAHUR")
@@ -65,8 +215,14 @@ async def dummy(callback_query: CallbackQuery, db: PostgresDatabase):
 
 
 @router.message(Command("get_unread_messages"))
-async def get_unread_chats(message: Message, avito_user: AvitoUser):
-    chats = await avito_user.get_unread_chats()
+async def get_unread_chats(message: Message, avito_client: AvitoClient):
+    """
+    Gets unread chats and lists them in inline buttons
+    :param message:
+    :param avito_client:
+    :return:
+    """
+    chats = await avito_client.get_unread_chats()
 
     if chats:
         builder = InlineKeyboardBuilder()
@@ -83,13 +239,16 @@ async def get_unread_chats(message: Message, avito_user: AvitoUser):
 
 
 @router.callback_query(ChatsCallbackFactory.filter())
-async def display_unread_messages(callback_query: CallbackQuery, avito_user: AvitoUser):
+async def display_messages(callback_query: CallbackQuery, avito_user: AvitoClient):
     """
-    Выводит непрочитанные сообщения в инлайн кнопках.
+    Gets messages by chat and lists n last messages
+    :param callback_query:
+    :param avito_user:
+    :return:
     """
     chat_id = callback_query.data.split(":")[1]
 
-    messages = await avito_user.get_unread_messages(chat_id)
+    messages = await avito_user.get_messages(chat_id)
 
     if messages:
         builder = InlineKeyboardBuilder()
@@ -110,7 +269,10 @@ async def display_unread_messages(callback_query: CallbackQuery, avito_user: Avi
 @router.callback_query(MessagesCallbackFactory.filter())
 async def message_actions(callback_query: CallbackQuery, state: FSMContext):
     """
-    Выводит опции ответа.
+    Offers options for answering to the message
+    :param callback_query:
+    :param state:
+    :return:
     """
     chat_id = callback_query.data.split(":")[1]
 
@@ -133,8 +295,7 @@ async def message_actions(callback_query: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "choose_template_message")
 async def choose_template_message(callback_query: CallbackQuery, db: PostgresDatabase):
     """
-    Выводит инлайн кнопки шаблонов сообщений.
-    Ведет на редактор шаблонов.
+    Gets template messages from database and displays them as inline buttons
     """
     tg_id = callback_query.from_user.id
     templates = await db.get_templates(tg_id=tg_id)
@@ -155,9 +316,12 @@ async def choose_template_message(callback_query: CallbackQuery, db: PostgresDat
 
 
 @router.callback_query(TemplatesCallbackFactory.filter())
-async def validate_template_message(callback_query: CallbackQuery, state: FSMContext, user_sessions: dict):
+async def validate_template_message(callback_query: CallbackQuery, state: FSMContext):
     """
-    Валидация отправления шаблона сообщения.
+    Validates sending the template message
+    :param callback_query:
+    :param state:
+    :return:
     """
 
     template_text = callback_query.data.split(":")[1]
@@ -183,11 +347,13 @@ async def validate_template_message(callback_query: CallbackQuery, state: FSMCon
 @router.message(Command("templates_editor"))
 async def edit_templates(message: Message):
     """
-    Редактор шаблонов.
+    Templates editor module that implements modifying template messages
+    :param message:
+    :return:
     """
     kb = [
-        [InlineKeyboardButton(text="Создать новый шаблон", callback_data=f"get_new_template_from_user")],
-        [InlineKeyboardButton(text="Редактировать существующий шаблон", callback_data=f"show_templates_to_edit")],
+        [InlineKeyboardButton(text="Создать новый шаблон", callback_data="get_new_template_from_user")],
+        [InlineKeyboardButton(text="Редактировать существующий шаблон", callback_data="show_templates_to_edit")],
     ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -200,7 +366,10 @@ async def edit_templates(message: Message):
 @router.callback_query(F.data == "show_templates_to_edit")
 async def show_templates_to_edit(callback_query: CallbackQuery, db: PostgresDatabase):
     """
-    Отображение шаблонов для изменения.
+    Gets template messages user has and displays them as inline buttons for user to choose which template to edit
+    :param callback_query:
+    :param db:
+    :return:
     """
     tg_id = callback_query.from_user.id
     templates = await db.get_templates(tg_id=tg_id)
@@ -209,8 +378,9 @@ async def show_templates_to_edit(callback_query: CallbackQuery, db: PostgresData
     # for key, value in template_messages.items():
     for template_text, template_id in templates:
         kb.append([InlineKeyboardButton(text=template_text,
+                                        # No need to replace it with callback factory because it leads to the same point
+                                        # another handler has
                                         callback_data=f"get_new_template_from_user|{template_id}"
-                                        # TODO: replace with CallbacksFactory
                                         )
                    ]
                   )
@@ -228,7 +398,10 @@ async def show_templates_to_edit(callback_query: CallbackQuery, db: PostgresData
 @router.callback_query(F.data.startswith("get_new_template_from_user"))
 async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMContext):
     """
-    Получение нового шаблона от пользователя.
+    Waits for user to insert new template
+    :param callback_query:
+    :param state:
+    :return:
     """
     if callback_query.data != 'get_new_template_from_user':
         # Add template id to state if template is to be updated further
@@ -243,7 +416,11 @@ async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMCo
 @router.message(ReplyState.waiting_for_new_template)
 async def create_new_template(message: Message, state: FSMContext, db: PostgresDatabase):
     """
-    Изменение шаблона.
+    Inserts new template to the database
+    :param message:
+    :param state:
+    :param db:
+    :return:
     """
     tg_id = message.from_user.id
     new_template = message.text
@@ -269,7 +446,10 @@ async def create_new_template(message: Message, state: FSMContext, db: PostgresD
 @router.callback_query(F.data.startswith("create_custom_message"))
 async def create_custom_message(callback_query: CallbackQuery, state: FSMContext):
     """
-    Ожидание кастомного сообщение от пользователя.
+    Waits for inserting custom message and sends it to validation
+    :param callback_query:
+    :param state:
+    :return:
     """
     await callback_query.message.answer(text="Введите сообщение ниже:")
     await state.set_state(ReplyState.waiting_for_custom_message)
@@ -279,7 +459,10 @@ async def create_custom_message(callback_query: CallbackQuery, state: FSMContext
 @router.message(ReplyState.waiting_for_custom_message)
 async def validate_custom_message(message: Message, state: FSMContext):
     """
-    Валидация кастомного сообщение от пользователя.
+    Validates custom message that user wishes to send
+    :param message:
+    :param state:
+    :return:
     """
     await state.update_data(message=message.text)
 
@@ -297,9 +480,13 @@ async def validate_custom_message(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "send_message")
-async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_user: AvitoUser):
+async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_user: AvitoClient):
     """
-    Отправка сообщения.
+    Sends message
+    :param callback_query:
+    :param state:
+    :param avito_user:
+    :return:
     """
 
     chat_id = await state.get_value("chat_id")
@@ -315,7 +502,10 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_u
 @router.message()
 async def process_other_text_answers(message: Message, user_sessions: dict):
     """
-    Обработка сообщений, не касающихся основных команд.
+    Processes messages sent to Telegram that do not fit in any filters
+    :param message:
+    :param user_sessions:
+    :return:
     """
     user_id = message.from_user.id
     avito_client = user_sessions.get(user_id)
