@@ -1,6 +1,7 @@
 import json
 import logging
 import aiohttp
+from aiohttp import ClientSession
 
 logger = logging.getLogger(__name__)
 
@@ -11,16 +12,16 @@ class AvitoClient:
     """
 
     def __init__(self):
-        self.client_id = None
-        self.client_secret = None
-        self.token = None
-        self.avito_id = None
-        self.name = None
-        self.number = None
-        self.session = aiohttp.ClientSession()
-        self.base_url = "https://api.avito.ru"
+        self.client_id: str | None = None
+        self.client_secret: str | None = None
+        self.token: str | None = None
+        self.avito_id: int | None = None
+        self.name: str | None = None
+        self.number: str | None = None
+        self.session: ClientSession = aiohttp.ClientSession()
+        self.base_url: str = "https://api.avito.ru"
 
-    async def run_session(self):
+    async def run_session(self) -> None:
 
         """
         Gets token and id of user in Avito
@@ -30,7 +31,7 @@ class AvitoClient:
         await self.get_token()
         await self.get_avito_id()
 
-    async def get_token(self):
+    async def get_token(self) -> str | None:
         """
         Gets token by secret keys
         :return: None
@@ -55,14 +56,14 @@ class AvitoClient:
                 logger.error(f"Ошибка получения токена: {response.status} - {await response.text()}")
         return
 
-    async def get_client_id(self):
+    async def get_client_id(self) -> str | None:
         """
         Getter for AVITO client id
         :return:
         """
         return self.client_id
 
-    async def set_client_id(self, client_id):
+    async def set_client_id(self, client_id: str) -> None:
         """
         Setter of client_id
         :param client_id:
@@ -70,14 +71,14 @@ class AvitoClient:
         """
         self.client_id = client_id
 
-    async def get_client_secret(self):
+    async def get_client_secret(self) -> str | None:
         """
         Getter for AVITO client secret
         :return:
         """
         return self.client_secret
 
-    async def set_client_secret(self, client_secret):
+    async def set_client_secret(self, client_secret: str) -> None:
         """
         Setter of client_secret
         :param client_secret:
@@ -85,7 +86,7 @@ class AvitoClient:
         """
         self.client_secret = client_secret
 
-    async def validate_avito_client(self):
+    async def validate_avito_client(self) -> bool:
         """
         Requests token of Avito client by given client_id and client_secret
         :return:
@@ -96,7 +97,7 @@ class AvitoClient:
         else:
             return False
 
-    async def get_avito_id(self):
+    async def get_avito_id(self) -> int | None:
         """
         Gets id of user in Avito
         :return: avito_id
@@ -121,7 +122,7 @@ class AvitoClient:
         else:
             return self.avito_id
 
-    async def get_avito_client_info(self):
+    async def get_avito_client_info(self) -> tuple | None:
         """
         Gets information about Avito account
         :return:
@@ -147,35 +148,35 @@ class AvitoClient:
 
         return
 
-    async def get_name(self):
+    async def get_name(self) -> str | None:
         """
         Getter for AVITO client name
         :return:
         """
         return self.name
 
-    async def set_name(self, name):
+    async def set_name(self, name: str) -> None:
         """
         Getter for AVITO client name
         :return:
         """
         self.name = name
 
-    async def get_number(self):
+    async def get_number(self) -> str | None:
         """
         Getter for AVITO client phone number
         :return:
         """
         return self.number
 
-    async def set_number(self, number):
+    async def set_number(self, number: str) -> None:
         """
         Getter for AVITO client name
         :return:
         """
         self.number = number
 
-    async def get_unread_chats(self):
+    async def get_unread_chats(self) -> list | None:
         """
         Gets unread chats
         :return: chats
@@ -220,7 +221,7 @@ class AvitoClient:
             else:
                 logger.error(f"Ошибка получения чатов: {response.status} - {await response.text()}")
 
-    async def get_messages(self, chat_id):
+    async def get_messages(self, chat_id: str) -> list | None:
         """
         Gets chat messages
         :return: messages
@@ -246,7 +247,7 @@ class AvitoClient:
                 logger.error(
                     f"Ошибка получения сообщений с чатом {chat_id}: {response.status} - {await response.text()}")
 
-    async def send_message(self, chat_id: int, message: str):
+    async def send_message(self, chat_id: int, message: str) -> None:
         """
         Sends message to chat
         chat_id: id of chat
@@ -273,25 +274,7 @@ class AvitoClient:
             else:
                 logger.error(f"Ошибка отправки сообщения: {response.status} - {await response.text()}")
 
-    # async def add_template(self, new_template):
-    #     """
-    #     Добавление нового шаблона
-    #     new_template: шаблон
-    #     """
-    #     templates_length = len(self.templates.values())
-    #     self.templates[templates_length] = new_template
-    #     logger.info("Шаблон успешно добавлен!")
-
-    # async def edit_template(self, template_id, new_template):
-    #     """
-    #     Изменение существующего шаблона
-    #     template_id: идентификатор шаблона, ключ в словаре templates
-    #     new_template: шаблон
-    #     """
-    #     self.templates[template_id] = new_template
-    #     logger.info("Шаблон успешно изменен!")
-
-    async def subscribe_to_notifications(self, server_url):
+    async def subscribe_to_notifications(self, server_url: str) -> None:
         """
         Sends request of subscription to notifications
         :param server_url: URL of server Avito will send notifications to
@@ -316,7 +299,7 @@ class AvitoClient:
             else:
                 logger.exception(f"Ошибка подписки: {response.status} - {await response.text()}")
 
-    async def unsubscribe_to_notifications(self, server_url):
+    async def unsubscribe_to_notifications(self, server_url: str) -> None:
         """
         Sends request of cancelling subscription to notifications
         :param server_url: URL of server Avito will stop sending notifications to
@@ -342,7 +325,7 @@ class AvitoClient:
             else:
                 logger.exception(f"Ошибка отписки: {response.status} - {await response.text()}")
 
-    async def close_session(self):
+    async def close_session(self) -> None:
         """
         Closes htto session
         """
