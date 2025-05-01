@@ -233,11 +233,11 @@ class AvitoClient:
         async with self.session.get(self.base_url + f"/messenger/v3/accounts/{self.avito_id}/chats/{chat_id}/messages",
                                     headers=headers) as response:
             if response.status == 200:
-                messages = (await response.json())["messages"]
+                chat_messages = (await response.json())["messages"]
                 messages = []
                 # Вывод последних 3 сообщений
                 for k in range(3):
-                    message_text = messages[k]["content"][
+                    message_text = chat_messages[k]["content"][
                         "text"]  # TODO: схема разная на разный тип отправляемого сообщения, дополнить тут впоследствии
                     messages.append(message_text)
                 logger.info("Информация о чатах успешно получена!")
