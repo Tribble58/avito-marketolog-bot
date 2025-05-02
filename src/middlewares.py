@@ -7,7 +7,7 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
-from src.database import PostgresDatabase
+from src.database import Database
 
 
 class TgUserCheckMiddleware(BaseMiddleware):
@@ -15,7 +15,7 @@ class TgUserCheckMiddleware(BaseMiddleware):
     Middleware for putting Telegram user to database and adding Avito id to it
     """
     def __init__(self, db):
-        self.db: PostgresDatabase = db
+        self.db: Database = db
 
     async def __call__(
             self,
@@ -41,7 +41,7 @@ class DbMiddleware(BaseMiddleware):
     Middleware for providing handlers with db and AvitoUser class
     """
     def __init__(self, db):
-        self.db: PostgresDatabase = db
+        self.db: Database = db
 
     async def __call__(
             self,

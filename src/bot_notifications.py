@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from src.avito import AvitoAccount
-from src.database import PostgresDatabase
+from src.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ async def start(message: Message):
 
 
 @router_notifications.message(Command("subscribe"))
-async def subscribe_to_notifications(message: Message, db: PostgresDatabase, server_url: str):
+async def subscribe_to_notifications(message: Message, db: Database, server_url: str):
     """
     Gets account token by secrets and subscribes for its notifications
     :param message:
@@ -55,7 +55,7 @@ async def subscribe_to_notifications(message: Message, db: PostgresDatabase, ser
 
 
 @router_notifications.message(Command("unsubscribe"))
-async def unsubscribe_from_notifications(message: Message, db: PostgresDatabase, server_url: str):
+async def unsubscribe_from_notifications(message: Message, db: Database, server_url: str):
     """
     Gets account token by secrets and unsubscribes from any notifications
     :param message:

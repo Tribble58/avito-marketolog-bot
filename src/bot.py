@@ -3,7 +3,7 @@ import logging
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import IntegrityError
 
-from src.database import PostgresDatabase
+from src.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ async def validate_connect_account(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "connect_account")
-async def connect_account(callback_query: CallbackQuery, db: PostgresDatabase, state: FSMContext):
+async def connect_account(callback_query: CallbackQuery, db: Database, state: FSMContext):
     """
     Connects account to user
     :param callback_query:
@@ -143,7 +143,7 @@ async def connect_account(callback_query: CallbackQuery, db: PostgresDatabase, s
 
 
 @router.callback_query(F.data == "list_accounts")
-async def list_accounts(callback_query: CallbackQuery, db: PostgresDatabase):
+async def list_accounts(callback_query: CallbackQuery, db: Database):
     """
     Lists all available account that user connected
     :param callback_query:
@@ -169,7 +169,7 @@ async def list_accounts(callback_query: CallbackQuery, db: PostgresDatabase):
 
 
 @router.callback_query(AccountsCallbackFactory.filter())
-async def disconnect_account(callback_query: CallbackQuery, db: PostgresDatabase):
+async def disconnect_account(callback_query: CallbackQuery, db: Database):
     """
     Disconnects account from user
     :param callback_query:
@@ -201,7 +201,7 @@ async def support(message: Message, user_sessions: dict):
 
 
 @commands_router.message(Command("something"))
-async def dummy(callback_query: CallbackQuery, db: PostgresDatabase):
+async def dummy(callback_query: CallbackQuery, db: Database):
     """
     Dummy
     :param callback_query:
@@ -293,7 +293,7 @@ async def message_actions(callback_query: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data == "choose_template_message")
-async def choose_template_message(callback_query: CallbackQuery, db: PostgresDatabase):
+async def choose_template_message(callback_query: CallbackQuery, db: Database):
     """
     Gets template messages from database and displays them as inline buttons
     """
@@ -364,7 +364,7 @@ async def edit_templates(message: Message):
 
 
 @router.callback_query(F.data == "show_templates_to_edit")
-async def show_templates_to_edit(callback_query: CallbackQuery, db: PostgresDatabase):
+async def show_templates_to_edit(callback_query: CallbackQuery, db: Database):
     """
     Gets template messages user has and displays them as inline buttons for user to choose which template to edit
     :param callback_query:
@@ -414,7 +414,7 @@ async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMCo
 
 
 @router.message(ReplyState.waiting_for_new_template)
-async def create_new_template(message: Message, state: FSMContext, db: PostgresDatabase):
+async def create_new_template(message: Message, state: FSMContext, db: Database):
     """
     Inserts new template to the database
     :param message:

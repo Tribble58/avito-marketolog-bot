@@ -22,9 +22,9 @@ from aiogram import Bot, Dispatcher
 
 from src.config import Settings
 
-from src.database import PostgresDatabase
+from src.database import Database
 
-db = PostgresDatabase()
+db = Database()
 
 
 async def on_startup():

@@ -10,7 +10,7 @@ from src.models import Base, User, UserTemplate, Account
 logger = logging.getLogger(__name__)
 
 
-class PostgresDatabase:
+class Database:
     def __init__(self, db_url: str = Settings.db_connection_uri):
         self.engine = create_async_engine(db_url)
         self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False)
