@@ -1,7 +1,5 @@
 import logging
 
-from src.avito import AvitoAccount
-
 logger = logging.getLogger(__name__)
 
 from typing import Callable, Dict, Any, Awaitable

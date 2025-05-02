@@ -1,9 +1,8 @@
 import logging
 
-import aiohttp
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message
 
 from src.avito import AvitoAccount
 from src.database import PostgresDatabase

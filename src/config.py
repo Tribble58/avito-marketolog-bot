@@ -1,6 +1,7 @@
+import os
+
 from aiogram.fsm.state import StatesGroup, State
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 

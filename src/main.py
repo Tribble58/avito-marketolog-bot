@@ -1,8 +1,9 @@
 import logging
 import subprocess
 import time
-import uvicorn
+
 import aiohttp
+import uvicorn
 from aiogram.types import BotCommand
 
 from src.bot import commands_router, router

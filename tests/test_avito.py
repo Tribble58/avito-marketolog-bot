@@ -1,8 +1,8 @@
-
 from aioresponses import aioresponses
 from pytest import fixture, mark
 import sys
 import os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.avito import AvitoAccount
 
@@ -210,4 +210,3 @@ async def test_send_message(avito_account):
 
         await avito_account.send_message(chat_id, message)
         await avito_account.close_session()
-
