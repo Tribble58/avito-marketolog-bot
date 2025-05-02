@@ -5,7 +5,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 
-from src.avito import AvitoClient
+from src.avito import AvitoAccount
 from src.database import PostgresDatabase
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ async def subscribe_to_notifications(message: Message, db: PostgresDatabase, ser
 
     secrets = await db.get_clients_secrets(tg_id=tg_id)
     for (client_id, client_secret) in secrets:
-        avito_client = AvitoClient()
+        avito_client = AvitoAccount()
         await avito_client.set_client_id(client_id=client_id)
         await avito_client.set_client_secret(client_secret=client_secret)
         await avito_client.get_token()
@@ -68,7 +68,7 @@ async def unsubscribe_from_notifications(message: Message, db: PostgresDatabase,
 
     secrets = await db.get_clients_secrets(tg_id=tg_id)
     for (client_id, client_secret) in secrets:
-        avito_client = AvitoClient()
+        avito_client = AvitoAccount()
         await avito_client.set_client_id(client_id=client_id)
         await avito_client.set_client_secret(client_secret=client_secret)
         await avito_client.get_token()

@@ -12,7 +12,7 @@ from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 
-from src.avito import AvitoClient
+from src.avito import AvitoAccount
 from src.config import ReplyState
 from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory, \
     AccountsCallbackFactory
@@ -92,7 +92,7 @@ async def validate_connect_account(message: Message, state: FSMContext):
     """
     client_id, client_secret = message.text.split(":")[0], message.text.split(":")[1]
 
-    avito_client = AvitoClient()
+    avito_client = AvitoAccount()
     await avito_client.set_client_id(client_id=client_id)
     await avito_client.set_client_secret(client_secret=client_secret)
     if not await avito_client.validate_avito_client():
@@ -129,7 +129,7 @@ async def connect_account(callback_query: CallbackQuery, db: PostgresDatabase, s
     :return:
     """
     tg_id = callback_query.from_user.id
-    avito_client: AvitoClient = await state.get_value("avito_client")
+    avito_client: AvitoAccount = await state.get_value("avito_client")
     avito_id = await avito_client.get_avito_id()
     name, number, client_id, client_secret = (await avito_client.get_name(),
                                               await avito_client.get_number(),
@@ -215,7 +215,7 @@ async def dummy(callback_query: CallbackQuery, db: PostgresDatabase):
 
 
 @router.message(Command("get_unread_messages"))
-async def get_unread_chats(message: Message, avito_client: AvitoClient):
+async def get_unread_chats(message: Message, avito_client: AvitoAccount):
     """
     Gets unread chats and lists them in inline buttons
     :param message:
@@ -239,7 +239,7 @@ async def get_unread_chats(message: Message, avito_client: AvitoClient):
 
 
 @router.callback_query(ChatsCallbackFactory.filter())
-async def display_messages(callback_query: CallbackQuery, avito_user: AvitoClient):
+async def display_messages(callback_query: CallbackQuery, avito_user: AvitoAccount):
     """
     Gets messages by chat and lists n last messages
     :param callback_query:
@@ -480,7 +480,7 @@ async def validate_custom_message(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "send_message")
-async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_user: AvitoClient):
+async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_user: AvitoAccount):
     """
     Sends message
     :param callback_query:

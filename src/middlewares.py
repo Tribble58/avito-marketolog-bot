@@ -1,6 +1,6 @@
 import logging
 
-from src.avito import AvitoClient
+from src.avito import AvitoAccount
 
 logger = logging.getLogger(__name__)
 

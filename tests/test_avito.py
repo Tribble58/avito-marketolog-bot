@@ -4,12 +4,12 @@ from pytest import fixture, mark
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.avito import AvitoClient
+from src.avito import AvitoAccount
 
 
 @fixture()
 async def avito_account():
-    account = AvitoClient()
+    account = AvitoAccount()
     account.client_id = "test_id"
     account.client_secret = "test_secret"
     return account
@@ -54,7 +54,7 @@ async def test_get_avito_id(avito_account):
         await avito_account.get_avito_id()
         await avito_account.close_session()
 
-        assert avito_account.avito_id == expected_avito_id
+        assert avito_account.id == expected_avito_id
 
 
 @mark.asyncio
@@ -78,7 +78,7 @@ async def test_validate_avito_client_success(avito_account):
 @mark.asyncio
 async def test_get_avito_client_info(avito_account):
     avito_account.token = "some-token"
-    avito_account.avito_id = 123
+    avito_account.id = 123
     expected_name = "Test User"
     expected_phone = "+79000000000"
 
@@ -95,7 +95,7 @@ async def test_get_avito_client_info(avito_account):
         assert name == expected_name
         assert phone == expected_phone
         assert avito_account.name == expected_name
-        assert avito_account.number == expected_phone
+        assert avito_account.phone_number == expected_phone
 
 
 @mark.asyncio
@@ -133,7 +133,7 @@ async def test_unsubscribe_to_notifications(avito_account):
 @mark.asyncio
 async def test_get_unread_chats(avito_account):
     avito_account.token = "some-token"
-    avito_account.avito_id = 123
+    avito_account.id = 123
     chat_response = {
         "chats": [
             {
@@ -155,7 +155,7 @@ async def test_get_unread_chats(avito_account):
 
     with aioresponses() as m:
         m.get(
-            f"https://api.avito.ru/messenger/v2/accounts/{avito_account.avito_id}/chats?unread_only=true",
+            f"https://api.avito.ru/messenger/v2/accounts/{avito_account.id}/chats?unread_only=true",
             payload=chat_response,
             status=200
         )
@@ -172,7 +172,7 @@ async def test_get_unread_chats(avito_account):
 @mark.asyncio
 async def test_get_messages(avito_account):
     avito_account.token = "some-token"
-    avito_account.avito_id = 123
+    avito_account.id = 123
     chat_id = 42
     message_response = {
         "messages": [
@@ -184,7 +184,7 @@ async def test_get_messages(avito_account):
 
     with aioresponses() as m:
         m.get(
-            f"https://api.avito.ru/messenger/v3/accounts/{avito_account.avito_id}/chats/{chat_id}/messages",
+            f"https://api.avito.ru/messenger/v3/accounts/{avito_account.id}/chats/{chat_id}/messages",
             payload=message_response,
             status=200
         )
@@ -198,13 +198,13 @@ async def test_get_messages(avito_account):
 @mark.asyncio
 async def test_send_message(avito_account):
     avito_account.token = "some-token"
-    avito_account.avito_id = 123
+    avito_account.id = 123
     chat_id = 42
     message = "Test message"
 
     with aioresponses() as m:
         m.post(
-            f"https://api.avito.ru/messenger/v1/accounts/{avito_account.avito_id}/chats/{chat_id}/messages/",
+            f"https://api.avito.ru/messenger/v1/accounts/{avito_account.id}/chats/{chat_id}/messages/",
             status=200
         )
 
