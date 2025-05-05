@@ -31,7 +31,7 @@ class Database:
             logger.debug("Session is get from factory!")
         return self._session
 
-    async def get_user_id(self, tg_id):
+    async def get_user_id(self, tg_id: int) -> int | None:
         """
         Gets id of user from users table
         :param tg_id:
@@ -48,7 +48,7 @@ class Database:
         else:
             logger.info(f"User {tg_id} does not exist.")
 
-    async def insert_user(self, tg_id: int):
+    async def insert_user(self, tg_id: int) -> None:
         """
         Adds new user to users table
         :param tg_id: 
@@ -68,7 +68,7 @@ class Database:
         await session.refresh(user)
         logger.info(f"Added new user {tg_id} to database!")
 
-    async def get_avito_id(self, tg_id):
+    async def get_avito_id(self, tg_id: int) -> int | None:
         """
         Gets avito_id of user from users table
         :param tg_id: 
@@ -88,10 +88,10 @@ class Database:
         else:
             logger.info(f"No corresponding account for user {tg_id}!")
 
-    async def get_account_id(self, tg_id, avito_id):
+    async def get_account_id(self, tg_id: int, avito_id: int) -> int | None:
         """
         Gets id of account from accounts table
-        :param user_id: id of user in users table
+        :param tg_id: id of user in users table
         :param avito_id: id of client in AVITO
         :return: int | None
         """
@@ -108,7 +108,8 @@ class Database:
         account_id = result.scalar_one_or_none()
         return account_id
 
-    async def insert_account(self, tg_id, avito_id, name, number, client_id, client_secret):
+    async def insert_account(self, tg_id: int, avito_id: int, name: str, number: str, client_id: str,
+                             client_secret: str) -> None:
         """
         Adds account to accounts table
         :param tg_id: id of user in users table
@@ -135,7 +136,7 @@ class Database:
         await session.refresh(account)
         logger.info(f"Added new account {avito_id} for user {tg_id} to database!")
 
-    async def get_accounts(self, tg_id):
+    async def get_accounts(self, tg_id: int) -> List[int]:
         """
         Gets Avito accounts connected to provided User id
         :param tg_id:
@@ -151,7 +152,7 @@ class Database:
         accounts = result.fetchall()
         return accounts
 
-    async def get_account_info(self, tg_id, avito_id):
+    async def get_account_info(self, tg_id: int, avito_id: int) -> List[Tuple[str, str]]:
         """
         Gets Avito account info (name, phone number, etc.)
         :param tg_id:
@@ -174,7 +175,7 @@ class Database:
         account_info = result.fetchall()
         return account_info
 
-    async def delete_account(self, tg_id, avito_id):
+    async def delete_account(self, tg_id: int, avito_id: int) -> None:
         """
         Deletes account
         :param tg_id:
@@ -190,7 +191,7 @@ class Database:
         )
         await session.commit()
 
-    async def get_account_secrets(self, tg_id, avito_id):
+    async def get_account_secrets(self, tg_id: int, avito_id: int) -> List[Tuple[str, str]]:
         """
         Gets client secret ids and keys
         :param tg_id:
@@ -214,7 +215,7 @@ class Database:
         secrets = result.fetchall()
         return secrets
 
-    async def get_tg_id_by_account(self, avito_id):
+    async def get_tg_id_by_account(self, avito_id: int) -> int | None:
         """
         Gets id of user in Telegram by user`s client
         :param avito_id:
@@ -250,7 +251,7 @@ class Database:
         templates = result.fetchall()
         return templates
 
-    async def add_template(self, tg_id, new_template):
+    async def add_template(self, tg_id: int, new_template: str) -> None:
         """
         Adds template to users_templates table
         :param tg_id:
@@ -264,7 +265,7 @@ class Database:
         await session.commit()
         logger.info(f"Template for {tg_id} has been added!")
 
-    async def update_template(self, tg_id, template_id, new_template):
+    async def update_template(self, tg_id: int, template_id: int, new_template: str) -> None:
         """
         Updates template of user in users_templates table
         :param tg_id:
@@ -285,7 +286,7 @@ class Database:
         await session.commit()
         logger.info(f"Template for {tg_id} has been updated!")
 
-    async def close(self):
+    async def close(self) -> None:
         """
         Closes session
         :return:
