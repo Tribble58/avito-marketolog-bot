@@ -329,7 +329,7 @@ class AvitoAccount:
 
     async def close_session(self) -> None:
         """
-        Closes htto session
+        Closes http session
         """
         await self.session.close()
         logger.info(f"Сессия для пользователя {self.id} закрыта!")
