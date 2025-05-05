@@ -75,35 +75,18 @@ class Database:
         :return: 
         """
         session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
         result = await session.execute(
-            select(User.avito_id)
-            .select_from(User)
-            .where(User.tg_id == tg_id)
+            select(Account.avito_id)
+            .select_from(Account)
+            .where(Account.user_id == user_id)
         )
         avito_user_id = result.scalar_one_or_none()
 
         if avito_user_id:
             return avito_user_id
         else:
-            logger.info(f"User {tg_id} has no AVITO id!")
-
-    async def insert_avito_id(self, tg_id, avito_id):
-        """
-        Updates user avito_id field of users table
-        :param tg_id:
-        :param avito_id:
-        :return:
-        """
-        session = await self.get_session()
-        await session.execute(
-            update(User)
-            .where(User.tg_id == tg_id)
-            .values(avito_id=avito_id)
-        )
-        await session.commit()
-        # await session.refresh(user)
-
-        logger.info(f"Added AVITO id to user {tg_id}!")
+            logger.info(f"No corresponding account for user {tg_id}!")
 
     async def get_account_id(self, tg_id, avito_id):
         """
@@ -145,7 +128,8 @@ class Database:
             return
 
         user_id = await self.get_user_id(tg_id=tg_id)
-        account = Account(user_id=user_id, avito_id=avito_id, name=name, number=number, client_id=client_id, client_secret=client_secret)
+        account = Account(user_id=user_id, avito_id=avito_id, name=name, number=number, client_id=client_id,
+                          client_secret=client_secret)
         session.add(account)
         await session.commit()
         await session.refresh(account)
@@ -153,8 +137,25 @@ class Database:
 
     async def get_accounts(self, tg_id):
         """
-        Gets AVITO accounts connected to provided user_id
+        Gets Avito accounts connected to provided User id
         :param tg_id:
+        :return:
+        """
+        session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
+        result = await session.execute(
+            select(Account.avito_id)
+            .select_from(Account)
+            .where(Account.user_id == user_id)
+        )
+        accounts = result.fetchall()
+        return accounts
+
+    async def get_account_info(self, tg_id, avito_id):
+        """
+        Gets Avito account info (name, phone number, etc.)
+        :param tg_id:
+        :param avito_id:
         :return:
         """
         session = await self.get_session()
@@ -165,31 +166,35 @@ class Database:
                 Account.number
             )
             .select_from(Account)
-            .where(Account.user_id == user_id)
+            .where(
+                (Account.user_id == user_id)
+                & (Account.avito_id == avito_id)
+            )
         )
-        accounts = result.fetchall()
-        return accounts
+        account_info = result.fetchall()
+        return account_info
 
-    async def delete_account(self, tg_id, number):
+    async def delete_account(self, tg_id, avito_id):
         """
         Deletes account
         :param tg_id:
-        :param number:
+        :param avito_id:
         :return:
         """
         session = await self.get_session()
         user_id = await self.get_user_id(tg_id=tg_id)
-        deleted_rows = await session.execute(
+        await session.execute(
             delete(Account).where(
                 (Account.user_id == user_id)
-                & (Account.number == number))
+                & (Account.avito_id == avito_id))
         )
         await session.commit()
 
-    async def get_clients_secrets(self, tg_id):
+    async def get_account_secrets(self, tg_id, avito_id):
         """
-        Gets clients secret ids and keys
+        Gets client secret ids and keys
         :param tg_id:
+        :param avito_id:
         :return:
         """
 
@@ -201,7 +206,10 @@ class Database:
                 Account.client_secret
             )
             .select_from(Account)
-            .where(Account.user_id == user_id)
+            .where(
+                (Account.user_id == user_id)
+                & (Account.avito_id == avito_id)
+            )
         )
         secrets = result.fetchall()
         return secrets

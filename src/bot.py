@@ -155,11 +155,12 @@ async def list_accounts(callback_query: CallbackQuery, db: Database):
 
     if accounts:
         builder = InlineKeyboardBuilder()
-        for name, number in accounts:
+        for avito_id in accounts:
+            name, number = await db.get_account_info(tg_id=tg_id, avito_id=avito_id)
             builder.button(
                 text=f"Имя аккаунта: {name},"
                      f"номер: {number}",
-                callback_data=AccountsCallbackFactory(number=number)
+                callback_data=AccountsCallbackFactory(avito_id=avito_id)
             )
         # One account per row
         builder.adjust(1)
@@ -177,11 +178,10 @@ async def disconnect_account(callback_query: CallbackQuery, db: Database):
     :return:
     """
     tg_id = callback_query.from_user.id
-    number = callback_query.data.split(":")[1]
+    avito_id = callback_query.data.split(":")[1]
 
-    await db.delete_account(tg_id=tg_id, number=number)
+    await db.delete_account(tg_id=tg_id, avito_id=avito_id)
     await callback_query.message.answer(text=f"Аккаунт успешно удален!")
-    pass
 
 
 @commands_router.message(Command("support"))

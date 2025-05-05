@@ -10,8 +10,5 @@ class MessagesCallbackFactory(CallbackData, prefix="message"):
 class TemplatesCallbackFactory(CallbackData, prefix="template"):
     template_text: str
 
-class AccountsCallbackFactory(CallbackData, prefix="number"):
-    number: str
-
-class AccountsCallbackFactory(CallbackData, prefix="number"):
-    number: str
+class AccountsCallbackFactory(CallbackData, prefix="avito_id"):
+    avito_id: str
