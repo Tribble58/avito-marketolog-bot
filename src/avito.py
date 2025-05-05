@@ -196,7 +196,8 @@ class AvitoAccount:
             if response.status == 200:
                 if len((await response.json())["chats"]) > 0:
                     chats = []
-                    logger.info(f"Получено непрочитанных чатов: {len((await response.json())["chats"])}")
+                    chats_number = len((await response.json())["chats"])
+                    logger.info(f"Получено непрочитанных чатов: {chats_number}")
                     # Вывести последние 3 чата
                     limit = 3
                     i = 0
@@ -222,7 +223,7 @@ class AvitoAccount:
             else:
                 logger.error(f"Ошибка получения чатов: {response.status} - {await response.text()}")
 
-    async def get_messages(self, chat_id: str) -> list | None:
+    async def get_messages(self, chat_id: id) -> list | None:
         """
         Gets chat messages
         :return: messages
@@ -239,8 +240,8 @@ class AvitoAccount:
                 messages = []
                 # Вывод последних 3 сообщений
                 for k in range(3):
-                    message_text = chat_messages[k]["content"][
-                        "text"]  # TODO: схема разная на разный тип отправляемого сообщения, дополнить тут впоследствии
+                    # TODO: схема разная на разный тип отправляемого сообщения, дополнить тут впоследствии
+                    message_text = chat_messages[k]["content"]["text"]
                     messages.append(message_text)
                 logger.info("Информация о чатах успешно получена!")
                 return messages
