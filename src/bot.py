@@ -178,7 +178,7 @@ async def disconnect_account(callback_query: CallbackQuery, db: Database):
     :return:
     """
     tg_id = callback_query.from_user.id
-    avito_id = callback_query.data.split(":")[1]
+    avito_id = int(callback_query.data.split(":")[1])
 
     await db.delete_account(tg_id=tg_id, avito_id=avito_id)
     await callback_query.message.answer(text=f"Аккаунт успешно удален!")
