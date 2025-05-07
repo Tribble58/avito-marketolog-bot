@@ -55,7 +55,7 @@ async def accounts_manager(message: Message):
     :return:
     """
     kb = [
-        [InlineKeyboardButton(text="Подключить аккаунт", callback_data="wait_for_client_secrets")],
+        [InlineKeyboardButton(text="Подключить аккаунт", callback_data="wait_for_account_secrets")],
         [InlineKeyboardButton(text="Отключить аккаунт", callback_data="list_accounts")],
     ]
     keyboard = InlineKeyboardMarkup(
@@ -68,8 +68,8 @@ async def accounts_manager(message: Message):
     # TODO: сделать чтобы кнопка не светилась после нажатия
 
 
-@router.callback_query(F.data == "wait_for_client_secrets")
-async def wait_for_client_secrets(callback_query: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == "wait_for_account_secrets")
+async def wait_for_account_secrets(callback_query: CallbackQuery, state: FSMContext):
     """
     Waits for user input and sends it to validation
     :param callback_query:
@@ -79,10 +79,10 @@ async def wait_for_client_secrets(callback_query: CallbackQuery, state: FSMConte
     await callback_query.message.answer(text="Введите client_id и client_secret аккаунта, который хотите подключить.\n"
                                              "Формат ввода: client_id:client_secret\n"
                                              "Пример: 54AZwJISvjVDasqDC13:ZzRUHTgoHMo5MtooCRuEIoa48Nv3pha12f23evwqq")
-    await state.set_state(ReplyState.waiting_for_client_secrets)
+    await state.set_state(ReplyState.waiting_for_account_secrets)
 
 
-@router.message(ReplyState.waiting_for_client_secrets)
+@router.message(ReplyState.waiting_for_account_secrets)
 async def validate_connect_account(message: Message, state: FSMContext):
     """
     Checks that client with provided secret keys exists in Avito, gets his info and displays to user
@@ -92,16 +92,16 @@ async def validate_connect_account(message: Message, state: FSMContext):
     """
     client_id, client_secret = message.text.split(":")[0], message.text.split(":")[1]
 
-    avito_client = AvitoAccount()
-    await avito_client.set_client_id(client_id=client_id)
-    await avito_client.set_client_secret(client_secret=client_secret)
-    if not await avito_client.validate_avito_client():
+    avito_account = AvitoAccount()
+    await avito_account.set_client_id(client_id=client_id)
+    await avito_account.set_client_secret(client_secret=client_secret)
+    if not await avito_account.validate_avito_account():
         await message.answer("Аккаунта не существует! Проверьте client_id и client_secret и попробуйте заново!")
 
-    await avito_client.run_session()
-    name, number = await avito_client.get_avito_client_info()
-    await avito_client.set_name(name=name)
-    await avito_client.set_number(number=number)
+    await avito_account.run_session()
+    name, number = await avito_account.get_avito_account_info()
+    await avito_account.set_name(name=name)
+    await avito_account.set_number(number=number)
 
     kb = [
         [InlineKeyboardButton(text="Да, подключить аккаунт", callback_data="connect_account")],
@@ -116,7 +116,7 @@ async def validate_connect_account(message: Message, state: FSMContext):
                               f"Имя аккаунта: {name}\n"
                               f"Телефон: {number}\n",
                          reply_markup=keyboard)
-    await state.update_data(avito_client=avito_client)
+    await state.update_data(avito_account=avito_account)
 
 
 @router.callback_query(F.data == "connect_account")
@@ -129,12 +129,12 @@ async def connect_account(callback_query: CallbackQuery, db: Database, state: FS
     :return:
     """
     tg_id = callback_query.from_user.id
-    avito_client: AvitoAccount = await state.get_value("avito_client")
-    avito_id = await avito_client.get_avito_id()
-    name, number, client_id, client_secret = (await avito_client.get_name(),
-                                              await avito_client.get_number(),
-                                              await avito_client.get_client_id(),
-                                              await avito_client.get_client_secret())
+    avito_account: AvitoAccount = await state.get_value("avito_account")
+    avito_id = await avito_account.get_avito_id()
+    name, number, client_id, client_secret = (await avito_account.get_name(),
+                                              await avito_account.get_number(),
+                                              await avito_account.get_client_id(),
+                                              await avito_account.get_client_secret())
 
     await db.insert_account(tg_id=tg_id, avito_id=avito_id, name=name, number=number, client_id=client_id,
                             client_secret=client_secret)
@@ -193,8 +193,8 @@ async def support(message: Message, user_sessions: dict):
     :return:
     """
     user_id = message.from_user.id
-    avito_client = user_sessions.get(user_id)
-    if not avito_client:
+    avito_account = user_sessions.get(user_id)
+    if not avito_account:
         await message.answer("Для начала работы введите /start")
         return
     await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
@@ -214,15 +214,15 @@ async def dummy(callback_query: CallbackQuery, db: Database):
     # await callback_query.answer()
 
 
-@router.message(Command("get_unread_messages"))
-async def get_unread_chats(message: Message, avito_client: AvitoAccount):
+@commands_router.message(Command("get_unread_messages"))
+async def get_unread_chats(message: Message, avito_account: AvitoAccount):
     """
     Gets unread chats and lists them in inline buttons
     :param message:
-    :param avito_client:
+    :param avito_account:
     :return:
     """
-    chats = await avito_client.get_unread_chats()
+    chats = await avito_account.get_unread_chats()
 
     if chats:
         builder = InlineKeyboardBuilder()
@@ -239,16 +239,16 @@ async def get_unread_chats(message: Message, avito_client: AvitoAccount):
 
 
 @router.callback_query(ChatsCallbackFactory.filter())
-async def display_messages(callback_query: CallbackQuery, avito_user: AvitoAccount):
+async def display_messages(callback_query: CallbackQuery, avito_account: AvitoAccount):
     """
     Gets messages by chat and lists n last messages
     :param callback_query:
-    :param avito_user:
+    :param avito_account:
     :return:
     """
     chat_id = callback_query.data.split(":")[1]
 
-    messages = await avito_user.get_messages(chat_id)
+    messages = await avito_account.get_messages(chat_id)
 
     if messages:
         builder = InlineKeyboardBuilder()
@@ -480,19 +480,19 @@ async def validate_custom_message(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "send_message")
-async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_user: AvitoAccount):
+async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_account: AvitoAccount):
     """
     Sends message
     :param callback_query:
     :param state:
-    :param avito_user:
+    :param avito_account:
     :return:
     """
 
     chat_id = await state.get_value("chat_id")
     message = await state.get_value("message")
 
-    await avito_user.send_message(chat_id, message)
+    await avito_account.send_message(chat_id, message)
     # Clear chat_id and message from state
     await state.clear()
     await callback_query.message.answer(text=f"Сообщение \"{message}\" отправлено!")
@@ -500,16 +500,10 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_u
 
 
 @router.message()
-async def process_other_text_answers(message: Message, user_sessions: dict):
+async def process_other_text_answers(message: Message):
     """
     Processes messages sent to Telegram that do not fit in any filters
     :param message:
-    :param user_sessions:
     :return:
     """
-    user_id = message.from_user.id
-    avito_client = user_sessions.get(user_id)
-    if not avito_client:
-        await message.answer("Для начала работы введите /start")
-    else:
-        await message.answer("Для начала работы введите /start или выберите нужную команду из списка Меню")
+    await message.answer("Для начала работы введите /start или выберите нужную команду из списка Меню")

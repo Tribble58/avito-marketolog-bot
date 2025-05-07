@@ -28,6 +28,6 @@ class ReplyState(StatesGroup):
     """
     Класс состояний ожидания ввода сообщений от пользователя
     """
-    waiting_for_client_secrets: State = State()
+    waiting_for_account_secrets: State = State()
     waiting_for_new_template: State = State()
     waiting_for_custom_message: State = State()

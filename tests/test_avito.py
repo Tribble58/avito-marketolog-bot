@@ -68,7 +68,7 @@ async def test_validate_avito_client_success(avito_account):
             status=200
         )
 
-        is_valid = await avito_account.validate_avito_client()
+        is_valid = await avito_account.validate_avito_account()
         await avito_account.close_session()
 
         assert is_valid is True
@@ -89,7 +89,7 @@ async def test_get_avito_client_info(avito_account):
             status=200
         )
 
-        name, phone = await avito_account.get_avito_client_info()
+        name, phone = await avito_account.get_avito_account_info()
         await avito_account.close_session()
 
         assert name == expected_name

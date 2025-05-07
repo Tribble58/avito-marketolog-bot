@@ -10,7 +10,7 @@ from aiogram.types import TelegramObject
 from src.database import Database
 
 
-class TgUserCheckMiddleware(BaseMiddleware):
+class CommandsMiddleware(BaseMiddleware):
     """
     Middleware for putting Telegram user to database and adding Avito id to it
     """
@@ -23,12 +23,12 @@ class TgUserCheckMiddleware(BaseMiddleware):
             event: TelegramObject,
             data: Dict[str, Any]
     ) -> Any:
-        logger.debug(f"Вызываю {TgUserCheckMiddleware.__name__}")
+        logger.debug(f"Вызываю {CommandsMiddleware.__name__}")
         tg_id = event.from_user.id
         user = await self.db.get_user_id(tg_id=tg_id)
         if not user:
             # TODO: add user and avito_user_id at one time
-            # Add row to TgUser table
+            # Add row to User table
             await self.db.insert_user(tg_id=tg_id)
 
         data["db"] = self.db

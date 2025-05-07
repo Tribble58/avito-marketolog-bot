@@ -87,7 +87,7 @@ class AvitoAccount:
         """
         self.client_secret = client_secret
 
-    async def validate_avito_client(self) -> bool:
+    async def validate_avito_account(self) -> bool:
         """
         Requests token of account by given client_id and client_secret
         :return:
@@ -123,7 +123,7 @@ class AvitoAccount:
         else:
             return self.id
 
-    async def get_avito_client_info(self) -> tuple | None:
+    async def get_avito_account_info(self) -> tuple | None:
         """
         Gets information about account, such as name and phone number
         :return:
