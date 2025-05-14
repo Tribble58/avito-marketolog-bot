@@ -77,7 +77,9 @@ async def test_delete_account(db: Database):
 @mark.asyncio
 async def test_template_crud(db: Database):
     await db.insert_user(123)
+    await db.insert_user(456)
     await db.add_template(123, "hello!")
+    await db.add_template(456, "welcome!")
     templates = await db.get_templates(123)
     assert len(templates) == 1
 

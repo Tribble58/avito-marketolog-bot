@@ -172,7 +172,7 @@ class Database:
                 & (Account.avito_id == avito_id)
             )
         )
-        account_info = result.fetchall()
+        account_info = result.one_or_none()
         return account_info
 
     async def delete_account(self, tg_id: int, avito_id: int) -> None:
@@ -212,7 +212,7 @@ class Database:
                 & (Account.avito_id == avito_id)
             )
         )
-        secrets = result.fetchall()
+        secrets = result.one_or_none()
         return secrets
 
     async def get_tg_id_by_account(self, avito_id: int) -> int | None:
@@ -240,13 +240,14 @@ class Database:
         """
         logger.info(f"Getting templates for user {tg_id}...")
         session = await self.get_session()
+        user_id = await self.get_user_id(tg_id=tg_id)
         result = await session.execute(
             select(
                 UserTemplate.template,
                 UserTemplate.id
             )
             .select_from(UserTemplate)
-            .where(UserTemplate.user_id == User.id)
+            .where(UserTemplate.user_id == user_id)
         )
         templates = result.fetchall()
         return templates

@@ -15,7 +15,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 from src.avito import AvitoAccount
 from src.config import ReplyState
 from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory, \
-    AccountsCallbackFactory
+    AccountsCallbackFactory, AccountsMessagesCallbackFactory
 
 """
 This main bot implements basic logic of User interaction with its Accounts.
@@ -27,11 +27,12 @@ Glossary:
     his/her account promotion.
 """
 
-commands_router = Router()
+# commands_router = Router()
 router = Router()
+avito_router = Router()
 
 
-@commands_router.message(Command("start"))
+@router.message(Command("start"))
 async def start(message: Message):
     """
     Start message with menu.
@@ -47,7 +48,7 @@ async def start(message: Message):
         "/something - ⚙️Че-то")
 
 
-@commands_router.message(Command("accounts_manager"))
+@router.message(Command("accounts_manager"))
 async def accounts_manager(message: Message):
     """
     Account manager module that is responsible for user interactions with managed Avito accounts
@@ -65,7 +66,6 @@ async def accounts_manager(message: Message):
     )
 
     await message.answer(text="Что сделать?", reply_markup=keyboard)
-    # TODO: сделать чтобы кнопка не светилась после нажатия
 
 
 @router.callback_query(F.data == "wait_for_account_secrets")
@@ -80,6 +80,7 @@ async def wait_for_account_secrets(callback_query: CallbackQuery, state: FSMCont
                                              "Формат ввода: client_id:client_secret\n"
                                              "Пример: 54AZwJISvjVDasqDC13:ZzRUHTgoHMo5MtooCRuEIoa48Nv3pha12f23evwqq")
     await state.set_state(ReplyState.waiting_for_account_secrets)
+    await callback_query.answer()
 
 
 @router.message(ReplyState.waiting_for_account_secrets)
@@ -140,6 +141,8 @@ async def connect_account(callback_query: CallbackQuery, db: Database, state: FS
                             client_secret=client_secret)
     await callback_query.message.answer(text="Аккаунт успешно добавлен!\n"
                                              "К управлению аккаунтами /accounts_manager")
+    await callback_query.answer()
+    await state.clear()
 
 
 @router.callback_query(F.data == "list_accounts")
@@ -150,16 +153,16 @@ async def list_accounts(callback_query: CallbackQuery, db: Database):
     :param db:
     :return:
     """
+
     tg_id = callback_query.from_user.id
     accounts = await db.get_accounts(tg_id=tg_id)
 
     if accounts:
         builder = InlineKeyboardBuilder()
-        for avito_id in accounts:
+        for (avito_id,) in accounts:
             name, number = await db.get_account_info(tg_id=tg_id, avito_id=avito_id)
             builder.button(
-                text=f"Имя аккаунта: {name},"
-                     f"номер: {number}",
+                text=f"Имя аккаунта: {name}, номер: {number}",
                 callback_data=AccountsCallbackFactory(avito_id=avito_id)
             )
         # One account per row
@@ -167,6 +170,8 @@ async def list_accounts(callback_query: CallbackQuery, db: Database):
         await callback_query.message.answer(text="Выберите аккаунт:", reply_markup=builder.as_markup())
     else:
         await callback_query.message.answer(text=f"Нет подключенных аккаунтов!")
+
+    await callback_query.answer()
 
 
 @router.callback_query(AccountsCallbackFactory.filter())
@@ -183,24 +188,21 @@ async def disconnect_account(callback_query: CallbackQuery, db: Database):
     await db.delete_account(tg_id=tg_id, avito_id=avito_id)
     await callback_query.message.answer(text=f"Аккаунт успешно удален!")
 
+    await callback_query.answer()
 
-@commands_router.message(Command("support"))
-async def support(message: Message, user_sessions: dict):
+
+@router.message(Command("support"))
+async def support(message: Message, ):
     """
     Auxiliary command for connecting admins
     :param message:
     :param user_sessions:
     :return:
     """
-    user_id = message.from_user.id
-    avito_account = user_sessions.get(user_id)
-    if not avito_account:
-        await message.answer("Для начала работы введите /start")
-        return
     await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
 
 
-@commands_router.message(Command("something"))
+@router.message(Command("something"))
 async def dummy(callback_query: CallbackQuery, db: Database):
     """
     Dummy
@@ -214,31 +216,57 @@ async def dummy(callback_query: CallbackQuery, db: Database):
     # await callback_query.answer()
 
 
-@commands_router.message(Command("get_unread_messages"))
-async def get_unread_chats(message: Message, avito_account: AvitoAccount):
+@router.message(Command("get_unread_messages"))
+async def get_connected_accounts(message: Message, db: Database, tg_id: int):
+    """
+    Gets accounts connected to user
+    :param message:
+    :param db:
+    :param tg_id:
+    :return:
+    """
+
+    accounts = await db.get_accounts(tg_id=tg_id)
+    if accounts:
+        builder = InlineKeyboardBuilder()
+        for (avito_id,) in accounts:
+            name, number = await db.get_account_info(tg_id=tg_id, avito_id=avito_id)
+            builder.button(
+                text=f"Аккаунт {name}",
+                callback_data=AccountsMessagesCallbackFactory(avito_id=avito_id)
+            )
+            builder.adjust(1)
+            await message.answer(text="Выберите аккаунт:", reply_markup=builder.as_markup())
+    else:
+        await message.answer(text="Подключенных аккаунтов нет! Для подключения воспользуйтесь /accounts_manager")
+
+
+@avito_router.callback_query(AccountsMessagesCallbackFactory.filter())
+async def get_account_unread_chats(callback_query: CallbackQuery, avito_account: AvitoAccount):
     """
     Gets unread chats and lists them in inline buttons
-    :param message:
+    :param callback_query:
     :param avito_account:
     :return:
     """
+    avito_id = await avito_account.get_avito_id()
     chats = await avito_account.get_unread_chats()
-
     if chats:
         builder = InlineKeyboardBuilder()
         for chat in chats:
             builder.button(
                 text=f"Чат с {chat["sender_name"]}",
-                callback_data=ChatsCallbackFactory(chat_id=chat["id"])
+                callback_data=ChatsCallbackFactory(avito_id=avito_id, chat_id=chat["id"])
             )
         # One chat per row
         builder.adjust(1)
-        await message.answer(text="Выберите чат:", reply_markup=builder.as_markup())
+        await callback_query.message.answer(text="Выберите чат:", reply_markup=builder.as_markup())
     else:
-        await message.answer(text=f"Непрочитанных чатов нет!")
+        await callback_query.message.answer(text=f"Непрочитанных чатов нет!")
+    await callback_query.answer()
 
 
-@router.callback_query(ChatsCallbackFactory.filter())
+@avito_router.callback_query(ChatsCallbackFactory.filter())
 async def display_messages(callback_query: CallbackQuery, avito_account: AvitoAccount):
     """
     Gets messages by chat and lists n last messages
@@ -246,7 +274,7 @@ async def display_messages(callback_query: CallbackQuery, avito_account: AvitoAc
     :param avito_account:
     :return:
     """
-    chat_id = callback_query.data.split(":")[1]
+    chat_id = callback_query.data.split(":")[2]
 
     messages = await avito_account.get_messages(chat_id)
 
