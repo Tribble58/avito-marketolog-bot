@@ -15,7 +15,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 from src.avito import AvitoAccount
 from src.config import ReplyState
 from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory, \
-    AccountsCallbackFactory, AccountsMessagesCallbackFactory
+    AccountsCallbackFactory, AccountsChatsCallbackFactory
 
 """
 This main bot implements basic logic of User interaction with its Accounts.
@@ -233,7 +233,7 @@ async def get_connected_accounts(message: Message, db: Database, tg_id: int):
             name, number = await db.get_account_info(tg_id=tg_id, avito_id=avito_id)
             builder.button(
                 text=f"Аккаунт {name}",
-                callback_data=AccountsMessagesCallbackFactory(avito_id=avito_id)
+                callback_data=AccountsChatsCallbackFactory(avito_id=avito_id)
             )
             builder.adjust(1)
             await message.answer(text="Выберите аккаунт:", reply_markup=builder.as_markup())
@@ -241,7 +241,7 @@ async def get_connected_accounts(message: Message, db: Database, tg_id: int):
         await message.answer(text="Подключенных аккаунтов нет! Для подключения воспользуйтесь /accounts_manager")
 
 
-@avito_router.callback_query(AccountsMessagesCallbackFactory.filter())
+@avito_router.callback_query(AccountsChatsCallbackFactory.filter())
 async def get_account_unread_chats(callback_query: CallbackQuery, avito_account: AvitoAccount):
     """
     Gets unread chats and lists them in inline buttons
@@ -305,8 +305,8 @@ async def message_actions(callback_query: CallbackQuery, state: FSMContext):
     chat_id = callback_query.data.split(":")[1]
 
     kb = [
-        [InlineKeyboardButton(text="Ответить шаблонным сообщением", callback_data=f"choose_template_message")],
-        [InlineKeyboardButton(text="Ответить другим сообщением", callback_data=f"create_custom_message")],
+        [InlineKeyboardButton(text="Ответить шаблонным сообщением", callback_data="choose_template_message")],
+        [InlineKeyboardButton(text="Ответить другим сообщением", callback_data="create_custom_message")],
     ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -339,7 +339,7 @@ async def choose_template_message(callback_query: CallbackQuery, db: Database):
         builder.adjust(1)
         await callback_query.message.answer(text="Выберите шаблон для ответа:", reply_markup=builder.as_markup())
     else:
-        await callback_query.message.answer(text=f"Шаблонов нет!\nПерейти к редактору шаблонов /templates_editor")
+        await callback_query.message.answer(text="Шаблонов нет!\nПерейти к редактору шаблонов /templates_editor")
     await callback_query.answer()
 
 
@@ -357,8 +357,8 @@ async def validate_template_message(callback_query: CallbackQuery, state: FSMCon
     await state.update_data(message=template_text)
 
     kb = [
-        [InlineKeyboardButton(text="Да, отправить данный шаблон сообщения", callback_data=f"send_message")],
-        [InlineKeyboardButton(text="Нет, выбрать другой шаблон сообщения", callback_data=f"choose_template_message")],
+        [InlineKeyboardButton(text="Да, отправить данный шаблон сообщения", callback_data="send_message")],
+        [InlineKeyboardButton(text="Нет, выбрать другой шаблон сообщения", callback_data="choose_template_message")],
     ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -471,7 +471,7 @@ async def create_new_template(message: Message, state: FSMContext, db: Database)
     await state.clear()
 
 
-@router.callback_query(F.data.startswith("create_custom_message"))
+@router.callback_query(F.data == "create_custom_message")
 async def create_custom_message(callback_query: CallbackQuery, state: FSMContext):
     """
     Waits for inserting custom message and sends it to validation
@@ -481,7 +481,7 @@ async def create_custom_message(callback_query: CallbackQuery, state: FSMContext
     """
     await callback_query.message.answer(text="Введите сообщение ниже:")
     await state.set_state(ReplyState.waiting_for_custom_message)
-    # await callback_query.answer()
+    await callback_query.answer()
 
 
 @router.message(ReplyState.waiting_for_custom_message)
@@ -495,8 +495,8 @@ async def validate_custom_message(message: Message, state: FSMContext):
     await state.update_data(message=message.text)
 
     kb = [
-        [InlineKeyboardButton(text="Да, отправить данное сообщение", callback_data=f"send_message")],
-        [InlineKeyboardButton(text="Нет, создать другое сообщение", callback_data=f"create_custom_message")],
+        [InlineKeyboardButton(text="Да, отправить данное сообщение", callback_data="send_message")],
+        [InlineKeyboardButton(text="Нет, создать другое сообщение", callback_data="create_custom_message")],
     ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -507,7 +507,7 @@ async def validate_custom_message(message: Message, state: FSMContext):
                          reply_markup=keyboard)
 
 
-@router.callback_query(F.data == "send_message")
+@avito_router.callback_query(F.data == "send_message")
 async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_account: AvitoAccount):
     """
     Sends message

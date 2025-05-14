@@ -18,5 +18,9 @@ class AccountsCallbackFactory(CallbackData, prefix="avito_id"):
     avito_id: int
 
 
-class AccountsMessagesCallbackFactory(CallbackData, prefix="account_chats"):
+class AccountsChatsCallbackFactory(CallbackData, prefix="account_chats"):
+    avito_id: int
+
+
+class AccountsChatsCallbackFactory(CallbackData, prefix="account_chats"):
     avito_id: int
