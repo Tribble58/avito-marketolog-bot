@@ -22,5 +22,5 @@ class AccountsChatsCallbackFactory(CallbackData, prefix="account_chats"):
     avito_id: int
 
 
-class AccountsChatsCallbackFactory(CallbackData, prefix="account_chats"):
+class CustomMessageCallbackFactory(CallbackData, prefix="custom_message"):
     avito_id: int

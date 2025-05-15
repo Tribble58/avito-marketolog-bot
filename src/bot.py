@@ -15,7 +15,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 from src.avito import AvitoAccount
 from src.config import ReplyState
 from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory, \
-    AccountsCallbackFactory, AccountsChatsCallbackFactory
+    AccountsCallbackFactory, AccountsChatsCallbackFactory, CustomMessageCallbackFactory
 
 """
 This main bot implements basic logic of User interaction with its Accounts.
@@ -153,7 +153,6 @@ async def list_accounts(callback_query: CallbackQuery, db: Database):
     :param db:
     :return:
     """
-
     tg_id = callback_query.from_user.id
     accounts = await db.get_accounts(tg_id=tg_id)
 
@@ -196,18 +195,16 @@ async def support(message: Message, ):
     """
     Auxiliary command for connecting admins
     :param message:
-    :param user_sessions:
     :return:
     """
     await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
 
 
 @router.message(Command("something"))
-async def dummy(callback_query: CallbackQuery, db: Database):
+async def dummy(callback_query: CallbackQuery):
     """
     Dummy
     :param callback_query:
-    :param db:
     :return:
     """
     # user_id = callback_query.from_user.id
@@ -225,7 +222,6 @@ async def get_connected_accounts(message: Message, db: Database, tg_id: int):
     :param tg_id:
     :return:
     """
-
     accounts = await db.get_accounts(tg_id=tg_id)
     if accounts:
         builder = InlineKeyboardBuilder()
@@ -256,7 +252,7 @@ async def get_account_unread_chats(callback_query: CallbackQuery, avito_account:
         for chat in chats:
             builder.button(
                 text=f"Чат с {chat["sender_name"]}",
-                callback_data=ChatsCallbackFactory(avito_id=avito_id, chat_id=chat["id"])
+                callback_data=ChatsCallbackFactory(chat_id=chat["id"], avito_id=avito_id)
             )
         # One chat per row
         builder.adjust(1)
@@ -267,7 +263,7 @@ async def get_account_unread_chats(callback_query: CallbackQuery, avito_account:
 
 
 @avito_router.callback_query(ChatsCallbackFactory.filter())
-async def display_messages(callback_query: CallbackQuery, avito_account: AvitoAccount):
+async def display_messages(callback_query: CallbackQuery, avito_account: AvitoAccount, state: FSMContext):
     """
     Gets messages by chat and lists n last messages
     :param callback_query:
@@ -275,8 +271,11 @@ async def display_messages(callback_query: CallbackQuery, avito_account: AvitoAc
     :return:
     """
     chat_id = callback_query.data.split(":")[2]
-
     messages = await avito_account.get_messages(chat_id)
+    # Get avito_id for further operations in handlers that are called not from avito_router and thus can not get avito_id
+    avito_id = await avito_account.get_avito_id()
+    await state.update_data(avito_account=avito_account)
+    logger.debug(f"Avito_id: {avito_id}")
 
     if messages:
         builder = InlineKeyboardBuilder()
@@ -303,6 +302,7 @@ async def message_actions(callback_query: CallbackQuery, state: FSMContext):
     :return:
     """
     chat_id = callback_query.data.split(":")[1]
+    logger.debug(f"Chat_id: {chat_id}")
 
     kb = [
         [InlineKeyboardButton(text="Ответить шаблонным сообщением", callback_data="choose_template_message")],
@@ -351,7 +351,6 @@ async def validate_template_message(callback_query: CallbackQuery, state: FSMCon
     :param state:
     :return:
     """
-
     template_text = callback_query.data.split(":")[1]
 
     await state.update_data(message=template_text)
@@ -403,7 +402,6 @@ async def show_templates_to_edit(callback_query: CallbackQuery, db: Database):
     templates = await db.get_templates(tg_id=tg_id)
 
     kb = []
-    # for key, value in template_messages.items():
     for template_text, template_id in templates:
         kb.append([InlineKeyboardButton(text=template_text,
                                         # No need to replace it with callback factory because it leads to the same point
@@ -492,23 +490,27 @@ async def validate_custom_message(message: Message, state: FSMContext):
     :param state:
     :return:
     """
-    await state.update_data(message=message.text)
+    message_text = message.text
+    await state.update_data(message=message_text)
 
-    kb = [
-        [InlineKeyboardButton(text="Да, отправить данное сообщение", callback_data="send_message")],
-        [InlineKeyboardButton(text="Нет, создать другое сообщение", callback_data="create_custom_message")],
-    ]
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=kb,
-        # Adjust button
-        resize_keyboard=True
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="Да, отправить данное сообщение",
+        callback_data="send_message"
     )
-    await message.answer(text=f"Вы уверены, что хотите оправить данное сообщение? \n{message.text}",
-                         reply_markup=keyboard)
+    builder.button(
+        text="Нет, создать другое сообщение",
+        callback_data="create_custom_message"
+    )
+    # One chat per row
+    builder.adjust(1)
+    await message.answer(text=f"Вы уверены, что хотите оправить данное сообщение? \n{message_text}",
+                         reply_markup=builder.as_markup())
 
 
-@avito_router.callback_query(F.data == "send_message")
-async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_account: AvitoAccount):
+@router.callback_query(F.data == "send_message")
+async def send_message(callback_query: CallbackQuery, state: FSMContext):
     """
     Sends message
     :param callback_query:
@@ -516,15 +518,21 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext, avito_a
     :param avito_account:
     :return:
     """
-
     chat_id = await state.get_value("chat_id")
     message = await state.get_value("message")
+    # TODO: костыль, исправить как-то
+    avito_account_: AvitoAccount = await state.get_value("avito_account")
+    avito_account = AvitoAccount()
+    await avito_account.set_client_id(client_id=(await avito_account_.get_client_id()))
+    await avito_account.set_client_secret(client_secret=(await avito_account_.get_client_secret()))
+    await avito_account.run_session()
 
     await avito_account.send_message(chat_id, message)
-    # Clear chat_id and message from state
-    await state.clear()
     await callback_query.message.answer(text=f"Сообщение \"{message}\" отправлено!")
     await callback_query.answer()
+    # Clear chat_id and message from state
+    await state.clear()
+    await avito_account.close_session()
 
 
 @router.message()

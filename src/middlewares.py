@@ -16,7 +16,6 @@ class DbOuterMiddleware(BaseMiddleware):
     """
     Middleware for putting User to database
     """
-
     def __init__(self, db):
         self.db: Database = db
 
@@ -47,7 +46,6 @@ class AvitoInnerMiddleware(BaseMiddleware):
     """
     Middleware for initializing AvitoClient class
     """
-
     async def __call__(
             self,
             handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -58,6 +56,12 @@ class AvitoInnerMiddleware(BaseMiddleware):
         # Get database instance from DbOuterMiddleware
         db = data["db"]
         tg_id = data["tg_id"]
+
+        # Check that previous router had callback data
+        if "callback_data" not in data:
+            logger.debug("callback_data не найдено, пропускаю AvitoInnerMiddleware")
+            return await handler(event, data)
+
         avito_id = data["callback_data"].avito_id
 
         # client_id = data["callback_data"].client_id
@@ -73,23 +77,3 @@ class AvitoInnerMiddleware(BaseMiddleware):
         result = await handler(event, data)
         await avito_account.close_session()
         return result
-
-
-# class DbMiddleware(BaseMiddleware):
-#     """
-#     Middleware for providing handlers with db and AvitoUser class
-#     """
-#     def __init__(self, db):
-#         self.db: Database = db
-#
-#     async def __call__(
-#             self,
-#             handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-#             event: TelegramObject,
-#             data: Dict[str, Any]
-#     ) -> Any:
-#         logger.debug(f"Вызываю {DbMiddleware.__name__}")
-#
-#         data["db"] = self.db
-#         result = await handler(event, data)
-#         return result
