@@ -63,8 +63,8 @@ async def test_insert_account(db: Database):
     await db.insert_account(123, 999, "test_name", "test_phone_number", "test_client_id", "test_client_secret")
     assert await db.get_avito_id(123) == 999
     assert await db.get_accounts(123) == [(999,)]
-    assert await db.get_account_info(123, 999) == [("test_name", "test_phone_number",)]
-    assert await db.get_account_secrets(123, 999) == [("test_client_id", "test_client_secret",)]
+    assert await db.get_account_info(123, 999) == ("test_name", "test_phone_number")
+    assert await db.get_account_secrets(123, 999) == ("test_client_id", "test_client_secret")
 
 @mark.asyncio
 async def test_delete_account(db: Database):
