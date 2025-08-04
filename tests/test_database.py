@@ -66,6 +66,7 @@ async def test_insert_account(db: Database):
     assert await db.get_account_info(123, 999) == ("test_name", "test_phone_number")
     assert await db.get_account_secrets(123, 999) == ("test_client_id", "test_client_secret")
 
+
 @mark.asyncio
 async def test_delete_account(db: Database):
     await db.insert_user(123)
@@ -87,3 +88,5 @@ async def test_template_crud(db: Database):
     await db.update_template(123, template_id, "updated")
     updated_templates = await db.get_templates(123)
     assert updated_templates[0][0] == "updated"
+    await db.delete_template(123, template_id)
+    assert len(await db.get_templates(123)) == 0

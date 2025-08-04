@@ -287,6 +287,24 @@ class Database:
         await session.commit()
         logger.info(f"Template for {tg_id} has been updated!")
 
+    async def delete_template(self, tg_id: int, template_id: int) -> None:
+        """
+        Deletes template in users_templates table
+        :param tg_id:
+        :param template_id:
+        :return:
+        """
+        session = await self.get_session()
+        user_id = select(User.id).where(User.tg_id == tg_id).scalar_subquery()
+        await session.execute(
+            delete(UserTemplate).where(
+                (UserTemplate.user_id == user_id)
+                & (UserTemplate.id == template_id)
+            )
+        )
+        await session.commit()
+        logger.info(f"Template {template_id} for {tg_id} has been deleted!")
+
     async def close(self) -> None:
         """
         Closes session

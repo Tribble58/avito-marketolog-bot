@@ -469,6 +469,24 @@ async def create_new_template(message: Message, state: FSMContext, db: Database)
     await state.clear()
 
 
+@router.message(F.data == "delete_template")
+async def delete_template(message: Message, state: FSMContext, db: Database):
+    """
+    Inserts new template to the database
+    :param message:
+    :param state:
+    :param db:
+    :return:
+    """
+    tg_id = message.from_user.id
+    new_template = message.text
+
+    template_id = await state.get_value("template_id")
+    await db.delete_template(tg_id=tg_id, template_id=template_id)
+    await message.answer(text="Шаблон успешно удален!\nК редактору шаблонов /templates_editor")
+    await state.clear()
+
+
 @router.callback_query(F.data == "create_custom_message")
 async def create_custom_message(callback_query: CallbackQuery, state: FSMContext):
     """
@@ -515,7 +533,6 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext):
     Sends message
     :param callback_query:
     :param state:
-    :param avito_account:
     :return:
     """
     chat_id = await state.get_value("chat_id")
