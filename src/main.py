@@ -11,7 +11,7 @@ from middlewares import AvitoInnerMiddleware
 from src.bot import router
 from src.bot_notifications import router_notifications
 from src.middlewares import DbOuterMiddleware
-from src.server_notifications import setup_server
+from src.server_notifications import setup_server, API_ENDPOINT
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.DEBUG,
@@ -130,7 +130,7 @@ async def on_startup():
 
     # Get public address and put it to notification bot
     server_url = await get_ngrok_url()
-    dp_notifications["server_url"] = server_url
+    dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
     try:

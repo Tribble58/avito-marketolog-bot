@@ -48,7 +48,8 @@ async def subscribe_to_notifications(message: Message, db: Database, server_url:
         await avito_client.set_client_id(client_id=client_id)
         await avito_client.set_client_secret(client_secret=client_secret)
         await avito_client.get_token()
-        logger.info(f"Клиент успешно найден!")
+        name, _ = await db.get_account_info(tg_id=tg_id, avito_id=avito_id)
+        logger.info(f"Клиент {name} успешно найден!")
         await avito_client.subscribe_to_notifications(server_url=server_url)
         await avito_client.close_session()
 
