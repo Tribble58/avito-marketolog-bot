@@ -42,7 +42,7 @@ async def subscribe_to_notifications(message: Message, db: Database, server_url:
     tg_id = message.from_user.id
 
     accounts = await db.get_accounts(tg_id=tg_id)
-    for avito_id in accounts:
+    for (avito_id,) in accounts:
         client_id, client_secret = await db.get_account_secrets(tg_id=tg_id, avito_id=avito_id)
         avito_client = AvitoAccount()
         await avito_client.set_client_id(client_id=client_id)

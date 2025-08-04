@@ -297,7 +297,7 @@ class AvitoAccount:
                 if (json.loads(await response.text()))["ok"]:
                     logger.debug(f"Пользователь подписался на уведомления клиента!")
                 else:
-                    logger.error("Не удалось подписаться на пользователя, сервер АВИСТО вернул ok = false")
+                    logger.error("Не удалось подписаться на пользователя, сервер АВИСТ вернул ok = false")
             else:
                 logger.exception(f"Ошибка подписки: {response.status} - {await response.text()}")
 
