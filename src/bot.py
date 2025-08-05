@@ -3,6 +3,7 @@ import logging
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import IntegrityError
 
+from callbacks import TemplatesCallbackFactory
 from src.database import Database
 
 logger = logging.getLogger(__name__)
@@ -14,15 +15,15 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 
 from src.avito import AvitoAccount
 from src.config import ReplyState
-from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplatesCallbackFactory, \
-    AccountsCallbackFactory, AccountsChatsCallbackFactory, CustomMessageCallbackFactory
+from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplateTextCallbackFactory, \
+    AccountsCallbackFactory, AccountsChatsCallbackFactory
 
 """
 This main bot implements basic logic of User interaction with its Accounts.
 All available commands are presented in the menu and in /start command.
 
 Glossary:
-    User is a person who manages several accounts, user is always considered in the Telgram context.
+    User is a person who manages several accounts, user is always considered in the Telegram context.
     Account is a client (shop, private person, seller, etc) that provides any kind of services in Avito and pays User for
     his/her account promotion.
 """
@@ -333,7 +334,7 @@ async def choose_template_message(callback_query: CallbackQuery, db: Database):
         for template_text, template_id in templates:
             builder.button(
                 text=f"{template_text}",
-                callback_data=TemplatesCallbackFactory(template_text=template_text)
+                callback_data=TemplateTextCallbackFactory(template_text=template_text)
             )
         # One chat per row
         builder.adjust(1)
@@ -343,10 +344,10 @@ async def choose_template_message(callback_query: CallbackQuery, db: Database):
     await callback_query.answer()
 
 
-@router.callback_query(TemplatesCallbackFactory.filter())
+@router.callback_query(TemplateTextCallbackFactory.filter())
 async def validate_template_message(callback_query: CallbackQuery, state: FSMContext):
     """
-    Validates sending the template message
+    Validates the process of sending the template message
     :param callback_query:
     :param state:
     :return:
@@ -379,8 +380,8 @@ async def edit_templates(message: Message):
     :return:
     """
     kb = [
+        [InlineKeyboardButton(text="Показать все шаблоны", callback_data="show_templates_to_edit")],
         [InlineKeyboardButton(text="Создать новый шаблон", callback_data="get_new_template_from_user")],
-        [InlineKeyboardButton(text="Редактировать существующий шаблон", callback_data="show_templates_to_edit")],
     ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -401,27 +402,46 @@ async def show_templates_to_edit(callback_query: CallbackQuery, db: Database):
     tg_id = callback_query.from_user.id
     templates = await db.get_templates(tg_id=tg_id)
 
-    kb = []
-    for template_text, template_id in templates:
-        kb.append([InlineKeyboardButton(text=template_text,
-                                        # No need to replace it with callback factory because it leads to the same point
-                                        # another handler has
-                                        callback_data=f"get_new_template_from_user|{template_id}"
-                                        )
-                   ]
-                  )
+    if templates:
+        builder = InlineKeyboardBuilder()
+        for template_text, template_id in templates:
+            builder.button(
+                text=f"{template_text}",
+                callback_data=TemplatesCallbackFactory(template_id=template_id)  # TODO: почему то кидает на валидацию
+            )
 
+        # One chat per row
+        builder.adjust(1)
+        await callback_query.message.answer(text="Для изменения шаблона выберите один из вариантов ниже:",
+                                            reply_markup=builder.as_markup())
+    else:
+        await callback_query.message.answer(text="Шаблонов нет!\nПерейти к редактору шаблонов /templates_editor")
+    await callback_query.answer()
+
+
+@router.callback_query(TemplatesCallbackFactory.filter())
+async def edit_options(callback_query: CallbackQuery, state: FSMContext):
+    """
+
+    :param state:
+    :param callback_query:
+    :return:
+    """
+    template_id = callback_query.data.split(":")[1]
+    await state.update_data(template_id=template_id)
+    kb = [
+        [InlineKeyboardButton(text="Изменить шаблона", callback_data="get_new_template_from_user")],
+        [InlineKeyboardButton(text="Удалить шаблон", callback_data="delete_template")],
+    ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
         # Adjust button
         resize_keyboard=True
     )
-
-    await callback_query.message.answer(text="Выберите шаблон для изменения:", reply_markup=keyboard)
-    await callback_query.answer()
+    await callback_query.message.answer(text="Выберите действие:", reply_markup=keyboard)
 
 
-@router.callback_query(F.data.startswith("get_new_template_from_user"))
+@router.callback_query(F.data == "get_new_template_from_user")
 async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMContext):
     """
     Waits for user to insert new template
@@ -429,10 +449,10 @@ async def get_new_template_from_user(callback_query: CallbackQuery, state: FSMCo
     :param state:
     :return:
     """
-    if callback_query.data != 'get_new_template_from_user':
-        # Add template id to state if template is to be updated further
-        template_id = int(callback_query.data.split('|')[-1])
-        await state.update_data(template_id=template_id)
+    # if callback_query.data != 'get_new_template_from_user':
+    #     # Add template id to state if template is to be updated further
+    #     template_id = int(callback_query.data.split('|')[-1])
+    #     await state.update_data(template_id=template_id)
 
     await callback_query.message.answer(text="Введите новый шаблон:")
     await state.set_state(ReplyState.waiting_for_new_template)
@@ -469,21 +489,20 @@ async def create_new_template(message: Message, state: FSMContext, db: Database)
     await state.clear()
 
 
-@router.message(F.data == "delete_template")
-async def delete_template(message: Message, state: FSMContext, db: Database):
+@router.callback_query(F.data == "delete_template")
+async def delete_template(callback_query: CallbackQuery, state: FSMContext, db: Database):
     """
     Inserts new template to the database
-    :param message:
+    :param callback_query:
     :param state:
     :param db:
     :return:
     """
-    tg_id = message.from_user.id
-    new_template = message.text
+    tg_id = callback_query.from_user.id
 
-    template_id = await state.get_value("template_id")
+    template_id = int(await state.get_value("template_id"))
     await db.delete_template(tg_id=tg_id, template_id=template_id)
-    await message.answer(text="Шаблон успешно удален!\nК редактору шаблонов /templates_editor")
+    await callback_query.message.answer(text="Шаблон успешно удален!\nК редактору шаблонов /templates_editor")
     await state.clear()
 
 

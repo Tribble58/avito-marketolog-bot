@@ -10,8 +10,12 @@ class MessagesCallbackFactory(CallbackData, prefix="message"):
     chat_id: str
 
 
-class TemplatesCallbackFactory(CallbackData, prefix="template"):
+class TemplateTextCallbackFactory(CallbackData, prefix="template_text"):
     template_text: str
+
+
+class TemplatesCallbackFactory(CallbackData, prefix="template"):
+    template_id: int
 
 
 class AccountsCallbackFactory(CallbackData, prefix="avito_id"):
