@@ -57,8 +57,8 @@ async def accounts_manager(message: Message):
     :return:
     """
     kb = [
+        [InlineKeyboardButton(text="Все аккаунты", callback_data="list_accounts")],
         [InlineKeyboardButton(text="Подключить аккаунт", callback_data="wait_for_account_secrets")],
-        [InlineKeyboardButton(text="Отключить аккаунт", callback_data="list_accounts")],
     ]
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=kb,
@@ -175,7 +175,28 @@ async def list_accounts(callback_query: CallbackQuery, db: Database):
 
 
 @router.callback_query(AccountsCallbackFactory.filter())
-async def disconnect_account(callback_query: CallbackQuery, db: Database):
+async def account_edit_options(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Provides edit options for accounts: disconnect, etc
+    :param state:
+    :param callback_query:
+    :return:
+    """
+    avito_id = int(callback_query.data.split(":")[1])
+
+    kb = [
+        [InlineKeyboardButton(text="Отключить аккаунт", callback_data="disconnect_account")],
+    ]
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=kb,
+        # Adjust button
+        resize_keyboard=True
+    )
+    await callback_query.message.answer("Выберите действие:", reply_markup=keyboard)
+    await state.update_data(avito_id=avito_id)
+
+@router.callback_query(F.data == "disconnect_account")
+async def disconnect_account(callback_query: CallbackQuery, db: Database, state: FSMContext):
     """
     Disconnects account from user
     :param callback_query:
@@ -183,7 +204,7 @@ async def disconnect_account(callback_query: CallbackQuery, db: Database):
     :return:
     """
     tg_id = callback_query.from_user.id
-    avito_id = int(callback_query.data.split(":")[1])
+    avito_id = await state.get_value("avito_id")
 
     await db.delete_account(tg_id=tg_id, avito_id=avito_id)
     await callback_query.message.answer(text=f"Аккаунт успешно удален!")
