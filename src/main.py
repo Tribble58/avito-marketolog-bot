@@ -1,14 +1,17 @@
 import logging
 import subprocess
 import time
-import uvicorn
+
 import aiohttp
+import uvicorn
 from aiogram.types import BotCommand
 
-from src.bot import commands_router, router
+from bot import avito_router
+from middlewares import AvitoInnerMiddleware
+from src.bot import router
 from src.bot_notifications import router_notifications
-from src.middlewares import TgUserCheckMiddleware, DbMiddleware
-from src.server_notifications import setup_server
+from src.middlewares import DbOuterMiddleware
+from src.server_notifications import setup_server, API_ENDPOINT
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.DEBUG,
@@ -21,9 +24,9 @@ from aiogram import Bot, Dispatcher
 
 from src.config import Settings
 
-from src.database import PostgresDatabase
+from src.database import Database
 
-db = PostgresDatabase()
+db = Database()
 
 
 async def on_startup():
@@ -92,16 +95,19 @@ async def on_startup():
     tg_bot = Bot(token=Settings.bot_token)
 
     dp = Dispatcher()
-    dp.include_router(commands_router)
+    # dp.include_router(commands_router)
     dp.include_router(router)
+    dp.include_router(avito_router)
 
     await db.init_models()
     await set_menu_commands(tg_bot)
 
     dp["db"] = db
-    commands_router.message.middleware(TgUserCheckMiddleware(db))
-    router.callback_query.middleware(DbMiddleware(db))
-    router.message.middleware(DbMiddleware(db))
+    # commands_router.message.outer_middleware(DbOuterMiddleware(db))
+    router.callback_query.outer_middleware(DbOuterMiddleware(db))
+    router.message.outer_middleware(DbOuterMiddleware(db))
+    avito_router.callback_query.outer_middleware(DbOuterMiddleware(db))
+    avito_router.callback_query.middleware(AvitoInnerMiddleware())
 
     # Skip updates while bot was unavailable
     # await tg_bot.delete_webhook(drop_pending_updates=True)
@@ -124,7 +130,7 @@ async def on_startup():
 
     # Get public address and put it to notification bot
     server_url = await get_ngrok_url()
-    dp_notifications["server_url"] = server_url
+    dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
     try:

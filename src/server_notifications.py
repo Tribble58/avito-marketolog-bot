@@ -4,9 +4,11 @@ logger = logging.getLogger(__name__)
 
 from aiogram import Bot
 from fastapi import FastAPI, Request, HTTPException
-from src.database import PostgresDatabase
+from src.database import Database
 
+API_ENDPOINT = "/avito/notifications"
 tg_id = None
+
 
 def setup_server(tg_bot_notifications: Bot):
     """
@@ -15,8 +17,8 @@ def setup_server(tg_bot_notifications: Bot):
     :return:
     """
     app = FastAPI()
-    db = PostgresDatabase()
-    @app.post("/avito/notifications")
+    db = Database()
+    @app.post(API_ENDPOINT)
     async def avito_webhook(request: Request):
         global tg_id
         try:

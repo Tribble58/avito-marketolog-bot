@@ -1,26 +1,28 @@
 import json
 import logging
+
 import aiohttp
+from aiohttp import ClientSession
 
 logger = logging.getLogger(__name__)
 
 
-class AvitoClient:
+class AvitoAccount:
     """
     Implements interaction with Avito API
     """
 
     def __init__(self):
-        self.client_id = None
-        self.client_secret = None
-        self.token = None
-        self.avito_id = None
-        self.name = None
-        self.number = None
-        self.session = aiohttp.ClientSession()
-        self.base_url = "https://api.avito.ru"
+        self.client_id: str | None = None
+        self.client_secret: str | None = None
+        self.token: str | None = None
+        self.id: int | None = None
+        self.name: str | None = None
+        self.phone_number: str | None = None
+        self.session: ClientSession = aiohttp.ClientSession()
+        self.base_url: str = "https://api.avito.ru"
 
-    async def run_session(self):
+    async def run_session(self) -> None:
 
         """
         Gets token and id of user in Avito
@@ -30,7 +32,7 @@ class AvitoClient:
         await self.get_token()
         await self.get_avito_id()
 
-    async def get_token(self):
+    async def get_token(self) -> str | None:
         """
         Gets token by secret keys
         :return: None
@@ -55,14 +57,14 @@ class AvitoClient:
                 logger.error(f"Ошибка получения токена: {response.status} - {await response.text()}")
         return
 
-    async def get_client_id(self):
+    async def get_client_id(self) -> str | None:
         """
-        Getter for AVITO client id
+        Getter for account client id
         :return:
         """
         return self.client_id
 
-    async def set_client_id(self, client_id):
+    async def set_client_id(self, client_id: str) -> None:
         """
         Setter of client_id
         :param client_id:
@@ -70,14 +72,14 @@ class AvitoClient:
         """
         self.client_id = client_id
 
-    async def get_client_secret(self):
+    async def get_client_secret(self) -> str | None:
         """
-        Getter for AVITO client secret
+        Getter for account client secret
         :return:
         """
         return self.client_secret
 
-    async def set_client_secret(self, client_secret):
+    async def set_client_secret(self, client_secret: str) -> None:
         """
         Setter of client_secret
         :param client_secret:
@@ -85,9 +87,9 @@ class AvitoClient:
         """
         self.client_secret = client_secret
 
-    async def validate_avito_client(self):
+    async def validate_avito_account(self) -> bool:
         """
-        Requests token of Avito client by given client_id and client_secret
+        Requests token of account by given client_id and client_secret
         :return:
         """
         await self.get_token()
@@ -96,9 +98,9 @@ class AvitoClient:
         else:
             return False
 
-    async def get_avito_id(self):
+    async def get_avito_id(self) -> int | None:
         """
-        Gets id of user in Avito
+        Gets id of account
         :return: avito_id
         """
 
@@ -110,20 +112,20 @@ class AvitoClient:
             "Authorization": f"Bearer {self.token}"
         }
 
-        if not self.avito_id:
+        if not self.id:
             async with self.session.get(self.base_url + "/core/v1/accounts/self", headers=headers) as response:
                 if response.status == 200:
-                    self.avito_id = (await response.json())["id"]
-                    logger.info(f"user_id получен: {self.avito_id}")
-                    return self.avito_id
+                    self.id = (await response.json())["id"]
+                    logger.info(f"user_id получен: {self.id}")
+                    return self.id
                 else:
                     logger.error(f"Ошибка получения user_id: {response.status} - {await response.text()}")
         else:
-            return self.avito_id
+            return self.id
 
-    async def get_avito_client_info(self):
+    async def get_avito_account_info(self) -> tuple | None:
         """
-        Gets information about Avito account
+        Gets information about account, such as name and phone number
         :return:
         """
 
@@ -136,46 +138,46 @@ class AvitoClient:
                 try:
                     result = await response.json()
                     name, number = result["name"], result["phone"]
-                    logger.info(f"Имя {name} и телефон {number} для аккаунта {self.avito_id} получены!")
-                    self.name, self.number = name, number
-                    return self.name, self.number
+                    logger.info(f"Имя {name} и телефон {number} для аккаунта {self.id} получены!")
+                    self.name, self.phone_number = name, number
+                    return self.name, self.phone_number
                 except KeyError as e:
                     logger.error(f"Ошибка получения имени или телефона: {e}")
             else:
                 logger.error(
-                    f"Ошибка получения имени и телефона для пользователя {self.avito_id}: {response.status} - {await response.text()}")
+                    f"Ошибка получения имени и телефона для пользователя {self.id}: {response.status} - {await response.text()}")
 
         return
 
-    async def get_name(self):
+    async def get_name(self) -> str | None:
         """
-        Getter for AVITO client name
+        Getter for account name
         :return:
         """
         return self.name
 
-    async def set_name(self, name):
+    async def set_name(self, name: str) -> None:
         """
-        Getter for AVITO client name
+        Getter for account name
         :return:
         """
         self.name = name
 
-    async def get_number(self):
+    async def get_number(self) -> str | None:
         """
         Getter for AVITO client phone number
         :return:
         """
-        return self.number
+        return self.phone_number
 
-    async def set_number(self, number):
+    async def set_number(self, number: str) -> None:
         """
         Getter for AVITO client name
         :return:
         """
-        self.number = number
+        self.phone_number = number
 
-    async def get_unread_chats(self):
+    async def get_unread_chats(self) -> list | None:
         """
         Gets unread chats
         :return: chats
@@ -189,19 +191,20 @@ class AvitoClient:
             "unread_only": "true"
         }
 
-        async with self.session.get(self.base_url + f"/messenger/v2/accounts/{self.avito_id}/chats", headers=headers,
+        async with self.session.get(self.base_url + f"/messenger/v2/accounts/{self.id}/chats", headers=headers,
                                     params=params) as response:
             if response.status == 200:
                 if len((await response.json())["chats"]) > 0:
                     chats = []
-                    logger.info(f"Получено непрочитанных чатов: {len((await response.json())["chats"])}")
+                    chats_number = len((await response.json())["chats"])
+                    logger.info(f"Получено непрочитанных чатов: {chats_number}")
                     # Вывести последние 3 чата
                     limit = 3
                     i = 0
                     for chat in (await response.json())["chats"]:
                         chat_id = chat["id"]
                         for k in range(len(chat["users"])):
-                            if chat["users"][k]["id"] != self.avito_id:
+                            if chat["users"][k]["id"] != self.id:
                                 sender_id = chat["users"][k]["id"]
                                 sender_name = chat["users"][k]["name"]
                         chats.append({
@@ -220,7 +223,7 @@ class AvitoClient:
             else:
                 logger.error(f"Ошибка получения чатов: {response.status} - {await response.text()}")
 
-    async def get_messages(self, chat_id):
+    async def get_messages(self, chat_id: id) -> list | None:
         """
         Gets chat messages
         :return: messages
@@ -230,15 +233,15 @@ class AvitoClient:
             "Authorization": f"Bearer {self.token}"
         }
 
-        async with self.session.get(self.base_url + f"/messenger/v3/accounts/{self.avito_id}/chats/{chat_id}/messages",
+        async with self.session.get(self.base_url + f"/messenger/v3/accounts/{self.id}/chats/{chat_id}/messages",
                                     headers=headers) as response:
             if response.status == 200:
-                messages = (await response.json())["messages"]
+                chat_messages = (await response.json())["messages"]
                 messages = []
                 # Вывод последних 3 сообщений
                 for k in range(3):
-                    message_text = messages[k]["content"][
-                        "text"]  # TODO: схема разная на разный тип отправляемого сообщения, дополнить тут впоследствии
+                    # TODO: схема разная на разный тип отправляемого сообщения, дополнить тут впоследствии
+                    message_text = chat_messages[k]["content"]["text"]
                     messages.append(message_text)
                 logger.info("Информация о чатах успешно получена!")
                 return messages
@@ -246,7 +249,7 @@ class AvitoClient:
                 logger.error(
                     f"Ошибка получения сообщений с чатом {chat_id}: {response.status} - {await response.text()}")
 
-    async def send_message(self, chat_id: int, message: str):
+    async def send_message(self, chat_id: int, message: str) -> None:
         """
         Sends message to chat
         chat_id: id of chat
@@ -265,7 +268,7 @@ class AvitoClient:
         }
 
         async with self.session.post(
-                self.base_url + f"/messenger/v1/accounts/{self.avito_id}/chats/{chat_id}/messages/",
+                self.base_url + f"/messenger/v1/accounts/{self.id}/chats/{chat_id}/messages/",
                 headers=headers,
                 json=payload) as response:
             if response.status == 200:
@@ -273,25 +276,7 @@ class AvitoClient:
             else:
                 logger.error(f"Ошибка отправки сообщения: {response.status} - {await response.text()}")
 
-    # async def add_template(self, new_template):
-    #     """
-    #     Добавление нового шаблона
-    #     new_template: шаблон
-    #     """
-    #     templates_length = len(self.templates.values())
-    #     self.templates[templates_length] = new_template
-    #     logger.info("Шаблон успешно добавлен!")
-
-    # async def edit_template(self, template_id, new_template):
-    #     """
-    #     Изменение существующего шаблона
-    #     template_id: идентификатор шаблона, ключ в словаре templates
-    #     new_template: шаблон
-    #     """
-    #     self.templates[template_id] = new_template
-    #     logger.info("Шаблон успешно изменен!")
-
-    async def subscribe_to_notifications(self, server_url):
+    async def subscribe_to_notifications(self, server_url: str) -> None:
         """
         Sends request of subscription to notifications
         :param server_url: URL of server Avito will send notifications to
@@ -312,11 +297,11 @@ class AvitoClient:
                 if (json.loads(await response.text()))["ok"]:
                     logger.debug(f"Пользователь подписался на уведомления клиента!")
                 else:
-                    logger.error("Не удалось подписаться на пользователя, сервер АВИСТО вернул ok = false")
+                    logger.error("Не удалось подписаться на пользователя, сервер АВИСТ вернул ok = false")
             else:
                 logger.exception(f"Ошибка подписки: {response.status} - {await response.text()}")
 
-    async def unsubscribe_to_notifications(self, server_url):
+    async def unsubscribe_to_notifications(self, server_url: str) -> None:
         """
         Sends request of cancelling subscription to notifications
         :param server_url: URL of server Avito will stop sending notifications to
@@ -342,9 +327,9 @@ class AvitoClient:
             else:
                 logger.exception(f"Ошибка отписки: {response.status} - {await response.text()}")
 
-    async def close_session(self):
+    async def close_session(self) -> None:
         """
-        Closes htto session
+        Closes http session
         """
         await self.session.close()
-        logger.info(f"Сессия для пользователя {self.avito_id} закрыта!")
+        logger.info(f"Сессия для пользователя {self.id} закрыта!")
