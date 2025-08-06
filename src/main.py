@@ -44,11 +44,11 @@ async def on_startup():
         await bot.set_my_commands(
             commands=
             [
-                BotCommand(command="get_unread_messages", description="🍌Получить непрочитанные чаты"),
-                BotCommand(command="templates_editor", description="🥭Редактор шаблонов"),
-                BotCommand(command="accounts_manager", description="🍉Управление аккаунтами"),
-                BotCommand(command="support", description="🍏Поддержка"),
-                BotCommand(command="something", description="⚙️Че-то"),
+                BotCommand(command="get_unread_messages", description="▫️Непрочитанные сообщения"),
+                BotCommand(command="templates_editor", description="▫️Редактор шаблонов"),
+                BotCommand(command="accounts_manager", description="▫️Управление аккаунтами"),
+                BotCommand(command="support", description="▫️Поддержка"),
+                # BotCommand(command="something", description="⚙️Че-то"),
             ]
         )
         logger.debug("Меню создано!")

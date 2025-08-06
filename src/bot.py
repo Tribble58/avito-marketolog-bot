@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 from aiogram import F, Router
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message, ErrorEvent
 
 from src.avito import AvitoAccount
 from src.config import ReplyState
@@ -42,11 +42,12 @@ async def start(message: Message):
 
     await message.answer(
         "Привет! Выбери команды из списка кнопки Меню, или введи команду вручную. Вот список команд:\n\n"
-        "/get_unread_messages - 🍌Получить непрочитанные чаты\n"
-        "/templates_editor - 🥭Открыть редактор шаблонов\n"
-        "/accounts_manager - 🍉Открыть управление аккаунтами\n"
-        "/support - 🍏Связаться с поддержкой\n"
-        "/something - ⚙️Че-то")
+        "/get_unread_messages - ▫️Непрочитанные сообщения\n"
+        "/templates_editor - ▫️Открыть редактор шаблонов\n"
+        "/accounts_manager - ▫️Открыть управление аккаунтами\n"
+        "/support - ▫️Связаться с поддержкой\n"
+        # "/something - ⚙️Че-то"
+    )
 
 
 @router.message(Command("accounts_manager"))
@@ -195,6 +196,7 @@ async def account_edit_options(callback_query: CallbackQuery, state: FSMContext)
     await callback_query.message.answer("Выберите действие:", reply_markup=keyboard)
     await state.update_data(avito_id=avito_id)
 
+
 @router.callback_query(F.data == "disconnect_account")
 async def disconnect_account(callback_query: CallbackQuery, db: Database, state: FSMContext):
     """
@@ -219,7 +221,7 @@ async def support(message: Message, ):
     :param message:
     :return:
     """
-    await message.answer(text="Здесь будет модуль взаимодействия с поддержкой")
+    await message.answer(text="Для обратной связи, предложений и пожеланий принимаем сообщения на почту bibaboba98@yandex.ru")
 
 
 @router.message(Command("something"))
@@ -451,7 +453,7 @@ async def edit_options(callback_query: CallbackQuery, state: FSMContext):
     template_id = callback_query.data.split(":")[1]
     await state.update_data(template_id=template_id)
     kb = [
-        [InlineKeyboardButton(text="Изменить шаблона", callback_data="get_new_template_from_user")],
+        [InlineKeyboardButton(text="Изменить шаблон", callback_data="get_new_template_from_user")],
         [InlineKeyboardButton(text="Удалить шаблон", callback_data="delete_template")],
     ]
     keyboard = InlineKeyboardMarkup(
@@ -492,7 +494,7 @@ async def create_new_template(message: Message, state: FSMContext, db: Database)
     tg_id = message.from_user.id
     new_template = message.text
 
-    template_id = await state.get_value("template_id")
+    template_id = int(await state.get_value("template_id"))
 
     # Update template if template_id is not None else add new template
     if template_id:
@@ -586,6 +588,7 @@ async def send_message(callback_query: CallbackQuery, state: FSMContext):
 
     await avito_account.send_message(chat_id, message)
     await callback_query.message.answer(text=f"Сообщение \"{message}\" отправлено!")
+    # TODO: сделать так, чтобы это сообщение было прочитано
     await callback_query.answer()
     # Clear chat_id and message from state
     await state.clear()
@@ -600,3 +603,15 @@ async def process_other_text_answers(message: Message):
     :return:
     """
     await message.answer("Для начала работы введите /start или выберите нужную команду из списка Меню")
+
+
+@router.error()
+async def global_error_handler(event: ErrorEvent):
+    """
+    Global error handler for all types of errors
+    :param event:
+    :return:
+    """
+    logger.critical("Critical error caused by %s", event.exception, exc_info=True)
+
+    return True
