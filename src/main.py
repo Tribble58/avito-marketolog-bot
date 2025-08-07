@@ -8,6 +8,7 @@ from aiogram.types import BotCommand
 
 from bot import avito_router
 from middlewares import AvitoInnerMiddleware
+from routers.accounts_manager.accounts_manager import accounts_manager_router
 from src.bot import router
 from src.bot_notifications import router_notifications
 from src.middlewares import DbOuterMiddleware
@@ -95,7 +96,8 @@ async def on_startup():
     tg_bot = Bot(token=Settings.bot_token)
 
     dp = Dispatcher()
-    # dp.include_router(commands_router)
+
+    dp.include_router(accounts_manager_router)
     dp.include_router(router)
     dp.include_router(avito_router)
 
