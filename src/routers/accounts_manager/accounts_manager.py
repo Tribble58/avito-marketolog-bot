@@ -11,8 +11,7 @@ from aiogram.fsm.context import FSMContext
 
 from src.config import ReplyState
 from src.database import Database
-from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplateTextCallbackFactory, \
-    AccountsCallbackFactory, AccountsChatsCallbackFactory
+from src.callbacks import AccountsCallbackFactory
 
 from avito import AvitoAccount
 
@@ -186,3 +185,15 @@ async def connect_account(callback_query: CallbackQuery, db: Database, state: FS
                                              "К управлению аккаунтами /accounts_manager")
     await callback_query.answer()
     await state.clear()
+
+
+@accounts_manager_router.error()
+async def error_handler(event: ErrorEvent):
+    """
+    Error handler for all types of errors
+    :param event:
+    :return:
+    """
+    logger.critical("Accounts manager: error caused by %s", event.exception, exc_info=True)
+
+    return True

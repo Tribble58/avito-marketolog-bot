@@ -9,6 +9,7 @@ from aiogram.types import BotCommand
 from bot import avito_router
 from middlewares import AvitoInnerMiddleware
 from routers.accounts_manager.accounts_manager import accounts_manager_router
+from routers.chat_manager.chat_manager import chat_manager_router, avito_service_router
 from src.bot import router
 from src.bot_notifications import router_notifications
 from src.middlewares import DbOuterMiddleware
@@ -97,7 +98,9 @@ async def on_startup():
 
     dp = Dispatcher()
 
+    dp.include_router(chat_manager_router)
     dp.include_router(accounts_manager_router)
+    dp.include_router(avito_service_router)
     dp.include_router(router)
     dp.include_router(avito_router)
 
@@ -106,6 +109,10 @@ async def on_startup():
 
     dp["db"] = db
     # commands_router.message.outer_middleware(DbOuterMiddleware(db))
+    chat_manager_router.message.outer_middleware(DbOuterMiddleware(db))
+    chat_manager_router.callback_query.outer_middleware(DbOuterMiddleware(db))
+    avito_service_router.callback_query.outer_middleware(DbOuterMiddleware(db))
+    avito_service_router.callback_query.middleware(AvitoInnerMiddleware())
     router.callback_query.outer_middleware(DbOuterMiddleware(db))
     router.message.outer_middleware(DbOuterMiddleware(db))
     avito_router.callback_query.outer_middleware(DbOuterMiddleware(db))
