@@ -44,7 +44,7 @@ async def on_startup():
         await bot.set_my_commands(
             commands=
             [
-                BotCommand(command="get_unread_messages", description="▫️Непрочитанные сообщения"),
+                BotCommand(command="chat_manager", description="▫️Непрочитанные сообщения"),
                 BotCommand(command="templates_editor", description="▫️Редактор шаблонов"),
                 BotCommand(command="accounts_manager", description="▫️Управление аккаунтами"),
                 BotCommand(command="support", description="▫️Поддержка"),

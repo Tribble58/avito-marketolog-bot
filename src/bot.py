@@ -42,7 +42,7 @@ async def start(message: Message):
 
     await message.answer(
         "Привет! Выбери команды из списка кнопки Меню, или введи команду вручную. Вот список команд:\n\n"
-        "/get_unread_messages - ▫️Непрочитанные сообщения\n"
+        "/chat_manager - ▫️Непрочитанные сообщения\n"
         "/templates_editor - ▫️Открыть редактор шаблонов\n"
         "/accounts_manager - ▫️Открыть управление аккаунтами\n"
         "/support - ▫️Связаться с поддержкой\n"
@@ -237,7 +237,7 @@ async def dummy(callback_query: CallbackQuery):
     # await callback_query.answer()
 
 
-@router.message(Command("get_unread_messages"))
+@router.message(Command("chat_manager"))
 async def get_connected_accounts(message: Message, db: Database, tg_id: int):
     """
     Gets accounts connected to user
