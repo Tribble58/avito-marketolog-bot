@@ -43,7 +43,7 @@ class Account(BaseModel):
     __tablename__ = 'accounts'
 
     user_id = Column(Integer, ForeignKey(User.id), nullable=False)
-    avito_id = Column(Integer, unique=True, nullable=False)
+    avito_id = Column(Integer, nullable=False)
     name = Column(VARCHAR(length=1000))
     number = Column(VARCHAR(length=1000))
     client_id = Column(VARCHAR(length=1000))

@@ -6,10 +6,12 @@ import aiohttp
 import uvicorn
 from aiogram.types import BotCommand
 
-from bot import avito_router
 from middlewares import AvitoInnerMiddleware
+from routers.accounts_manager import accounts_manager_router
+from routers.chat_manager import chat_manager_router, avito_service_router
+from routers.templates_editor import templates_editor_router
+from routers.notifications import notifications_router
 from src.bot import router
-from src.bot_notifications import router_notifications
 from src.middlewares import DbOuterMiddleware
 from src.server_notifications import setup_server, API_ENDPOINT
 
@@ -44,11 +46,11 @@ async def on_startup():
         await bot.set_my_commands(
             commands=
             [
-                BotCommand(command="get_unread_messages", description="🍌Получить непрочитанные чаты"),
-                BotCommand(command="templates_editor", description="🥭Редактор шаблонов"),
-                BotCommand(command="accounts_manager", description="🍉Управление аккаунтами"),
-                BotCommand(command="support", description="🍏Поддержка"),
-                BotCommand(command="something", description="⚙️Че-то"),
+                BotCommand(command="chat_manager", description="▫️Непрочитанные сообщения"),
+                BotCommand(command="templates_editor", description="▫️Редактор шаблонов"),
+                BotCommand(command="accounts_manager", description="▫️Управление аккаунтами"),
+                BotCommand(command="support", description="▫️Поддержка"),
+                # BotCommand(command="something", description="⚙️Че-то"),
             ]
         )
         logger.debug("Меню создано!")
@@ -95,26 +97,32 @@ async def on_startup():
     tg_bot = Bot(token=Settings.bot_token)
 
     dp = Dispatcher()
-    # dp.include_router(commands_router)
-    dp.include_router(router)
-    dp.include_router(avito_router)
+
+    dp.include_router(chat_manager_router)
+    dp.include_router(accounts_manager_router)
+    dp.include_router(avito_service_router)
+    dp.include_router(templates_editor_router)
 
     await db.init_models()
     await set_menu_commands(tg_bot)
 
     dp["db"] = db
     # commands_router.message.outer_middleware(DbOuterMiddleware(db))
+    chat_manager_router.message.outer_middleware(DbOuterMiddleware(db))
+    chat_manager_router.callback_query.outer_middleware(DbOuterMiddleware(db))
+    avito_service_router.callback_query.outer_middleware(DbOuterMiddleware(db))
+    avito_service_router.callback_query.middleware(AvitoInnerMiddleware())
+    templates_editor_router.message.outer_middleware(DbOuterMiddleware(db))
+    templates_editor_router.callback_query.outer_middleware(DbOuterMiddleware(db))
     router.callback_query.outer_middleware(DbOuterMiddleware(db))
     router.message.outer_middleware(DbOuterMiddleware(db))
-    avito_router.callback_query.outer_middleware(DbOuterMiddleware(db))
-    avito_router.callback_query.middleware(AvitoInnerMiddleware())
 
     # Skip updates while bot was unavailable
     # await tg_bot.delete_webhook(drop_pending_updates=True)
 
     tg_bot_notifications = Bot(token=Settings.notifications_bot_token)
     dp_notifications = Dispatcher()
-    dp_notifications.include_router(router_notifications)
+    dp_notifications.include_router(notifications_router)
     dp_notifications["db"] = db
     await set_menu_commands_for_notifications(tg_bot_notifications)
 

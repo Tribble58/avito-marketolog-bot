@@ -1,5 +1,7 @@
 import logging
 
+logger = logging.getLogger(__name__)
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -7,16 +9,14 @@ from aiogram.types import Message
 from src.avito import AvitoAccount
 from src.database import Database
 
-logger = logging.getLogger(__name__)
-
-router_notifications = Router()
+notifications_router = Router()
 
 """
 This bot acts as a receiver of notifications that Avito server sends to our server by webhook.
 It contains several commands represented in menu that basically implement subscription/unsubscription functions. 
 """
 
-@router_notifications.message(Command("start"))
+@notifications_router.message(Command("start"))
 async def start(message: Message):
     """
     Start command with available options
@@ -30,7 +30,7 @@ async def start(message: Message):
                          "🔕/unsubscribe, чтобы отписаться от уведомлений клиентов, которые Вы подключили в модуле управления аккаунтами")
 
 
-@router_notifications.message(Command("subscribe"))
+@notifications_router.message(Command("subscribe"))
 async def subscribe_to_notifications(message: Message, db: Database, server_url: str):
     """
     Gets account token by secrets and subscribes for its notifications
@@ -56,7 +56,7 @@ async def subscribe_to_notifications(message: Message, db: Database, server_url:
     await message.answer("Вы подписаны на все уведомления!")
 
 
-@router_notifications.message(Command("unsubscribe"))
+@notifications_router.message(Command("unsubscribe"))
 async def unsubscribe_from_notifications(message: Message, db: Database, server_url: str):
     """
     Gets account token by secrets and unsubscribes from any notifications

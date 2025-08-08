@@ -20,6 +20,7 @@ async def db():
     """
     db = Database(db_url=TEST_DB_URL)
     await db.init_models()
+    await db.insert_user(123)
     yield db
 
     # Close database session at the end
@@ -47,8 +48,8 @@ async def test_insert_user(db: Database):
     :param db:
     :return:
     """
-    await db.insert_user(123)
-    user_id = await db.get_user_id(123)
+    await db.insert_user(456)
+    user_id = await db.get_user_id(456)
     assert user_id is not None
 
 
@@ -59,7 +60,6 @@ async def test_insert_account(db: Database):
     :param db:
     :return:
     """
-    await db.insert_user(123)
     await db.insert_account(123, 999, "test_name", "test_phone_number", "test_client_id", "test_client_secret")
     assert await db.get_avito_id(123) == 999
     assert await db.get_accounts(123) == [(999,)]
@@ -69,7 +69,6 @@ async def test_insert_account(db: Database):
 
 @mark.asyncio
 async def test_delete_account(db: Database):
-    await db.insert_user(123)
     await db.insert_account(123, 999, "test_name", "test_phone_number", "test_client_id", "test_client_secret")
     await db.delete_account(123, 999)
     assert await db.get_avito_id(123) is None
@@ -77,7 +76,6 @@ async def test_delete_account(db: Database):
 
 @mark.asyncio
 async def test_template_crud(db: Database):
-    await db.insert_user(123)
     await db.insert_user(456)
     await db.add_template(123, "hello!")
     await db.add_template(456, "welcome!")

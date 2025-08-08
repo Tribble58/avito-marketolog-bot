@@ -36,7 +36,7 @@ def setup_server(tg_bot_notifications: Bot):
         logger.debug(f"tg_id: {tg_id}")
 
         if tg_id is None:
-            tg_id = await db.get_tg_id_by_account(avito_id=avito_id)
+            tg_id = await db.get_tg_id_by_account(avito_id=avito_id) #TODO: если у двух юзеров есть один аккаунт, то будет ошибка
             logger.debug(f"Идентификатор пользователя в Телеграм получен!")
 
         if tg_id is not None:
