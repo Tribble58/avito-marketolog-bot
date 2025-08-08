@@ -6,12 +6,12 @@ import aiohttp
 import uvicorn
 from aiogram.types import BotCommand
 
-from bot import avito_router
 from middlewares import AvitoInnerMiddleware
-from routers.accounts_manager.accounts_manager import accounts_manager_router
-from routers.chat_manager.chat_manager import chat_manager_router, avito_service_router
+from routers.accounts_manager import accounts_manager_router
+from routers.chat_manager import chat_manager_router, avito_service_router
+from routers.templates_editor import templates_editor_router
+from routers.notifications import notifications_router
 from src.bot import router
-from src.bot_notifications import router_notifications
 from src.middlewares import DbOuterMiddleware
 from src.server_notifications import setup_server, API_ENDPOINT
 
@@ -101,8 +101,7 @@ async def on_startup():
     dp.include_router(chat_manager_router)
     dp.include_router(accounts_manager_router)
     dp.include_router(avito_service_router)
-    dp.include_router(router)
-    dp.include_router(avito_router)
+    dp.include_router(templates_editor_router)
 
     await db.init_models()
     await set_menu_commands(tg_bot)
@@ -113,17 +112,17 @@ async def on_startup():
     chat_manager_router.callback_query.outer_middleware(DbOuterMiddleware(db))
     avito_service_router.callback_query.outer_middleware(DbOuterMiddleware(db))
     avito_service_router.callback_query.middleware(AvitoInnerMiddleware())
+    templates_editor_router.message.outer_middleware(DbOuterMiddleware(db))
+    templates_editor_router.callback_query.outer_middleware(DbOuterMiddleware(db))
     router.callback_query.outer_middleware(DbOuterMiddleware(db))
     router.message.outer_middleware(DbOuterMiddleware(db))
-    avito_router.callback_query.outer_middleware(DbOuterMiddleware(db))
-    avito_router.callback_query.middleware(AvitoInnerMiddleware())
 
     # Skip updates while bot was unavailable
     # await tg_bot.delete_webhook(drop_pending_updates=True)
 
     tg_bot_notifications = Bot(token=Settings.notifications_bot_token)
     dp_notifications = Dispatcher()
-    dp_notifications.include_router(router_notifications)
+    dp_notifications.include_router(notifications_router)
     dp_notifications["db"] = db
     await set_menu_commands_for_notifications(tg_bot_notifications)
 
