@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import time
+from multiprocessing.managers import Server
 
 import aiohttp
 import uvicorn
@@ -132,10 +133,10 @@ async def on_startup():
 
     # Run ngrok for port forwarding
     ngrok = subprocess.Popen(["ngrok", "http", "8080"])
-    time.sleep(3) # wait for ngrok to run up
+    time.sleep(3)  # wait for ngrok to run up
 
     # Get public address and put it to notification bot
-    server_url = await get_ngrok_url()
+    server_url = await get_ngrok_url() if Settings.server_url is None else Settings.server_url
     dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
