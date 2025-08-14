@@ -6,14 +6,14 @@ import aiohttp
 import uvicorn
 from aiogram.types import BotCommand
 
+from bot import router
 from middlewares import AvitoInnerMiddleware
+from middlewares import DbOuterMiddleware
 from routers.accounts_manager import accounts_manager_router
 from routers.chat_manager import chat_manager_router, avito_service_router
-from routers.templates_editor import templates_editor_router
 from routers.notifications import notifications_router
-from src.bot import router
-from src.middlewares import DbOuterMiddleware
-from src.server_notifications import setup_server, API_ENDPOINT
+from routers.templates_editor import templates_editor_router
+from server_notifications import setup_server, API_ENDPOINT
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.DEBUG,
@@ -23,10 +23,8 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 from aiogram import Bot, Dispatcher
-
-from src.config import Settings
-
-from src.database import Database
+from config import Settings
+from database import Database
 
 db = Database()
 
