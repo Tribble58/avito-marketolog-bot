@@ -1,10 +1,8 @@
 import logging
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy.exc import IntegrityError
 
-from callbacks import TemplatesCallbackFactory
-from src.database import Database
+from database import Database
 
 logger = logging.getLogger(__name__)
 
