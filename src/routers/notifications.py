@@ -6,8 +6,8 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from src.avito import AvitoAccount
-from src.database import Database
+from avito import AvitoAccount
+from database import Database
 
 notifications_router = Router()
 
