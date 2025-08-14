@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 
 from aiogram import Bot
 from fastapi import FastAPI, Request, HTTPException
-from src.database import Database
+from database import Database
 
 API_ENDPOINT = "/avito/notifications"
 tg_id = None
