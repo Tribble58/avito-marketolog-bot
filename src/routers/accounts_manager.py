@@ -9,9 +9,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 
-from src.config import ReplyState
-from src.database import Database
-from src.callbacks import AccountsCallbackFactory
+from config import ReplyState
+from database import Database
+from callbacks import AccountsCallbackFactory
 
 from avito import AvitoAccount
 
