@@ -4,8 +4,8 @@ from typing import Tuple, List
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from src.config import Settings
-from src.models import Base, User, UserTemplate, Account
+from config import Settings
+from models import Base, User, UserTemplate, Account
 
 logger = logging.getLogger(__name__)
 
