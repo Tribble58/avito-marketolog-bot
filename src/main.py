@@ -131,12 +131,16 @@ async def on_startup():
     # Run server with message sending functionality
     app = setup_server(tg_bot_notifications=tg_bot_notifications)
 
-    # Run ngrok for port forwarding
-    ngrok = subprocess.Popen(["ngrok", "http", "8080"])
-    time.sleep(3)  # wait for ngrok to run up
+    if Settings.server_url is None:
+        # Run ngrok for port forwarding
+        ngrok = subprocess.Popen(["ngrok", "http", "8080"])
+        time.sleep(3)  # wait for ngrok to run up
 
-    # Get public address and put it to notification bot
-    server_url = await get_ngrok_url() if Settings.server_url is None else Settings.server_url
+        # Get public address and put it to notification bot
+        server_url = await get_ngrok_url() if Settings.server_url is None else Settings.server_url
+    else:
+        # Get public adress from env file
+        server_url = Settings.server_url
     dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
