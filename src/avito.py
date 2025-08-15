@@ -290,8 +290,6 @@ class AvitoAccount:
             "url": server_url
         }
 
-        logger.debug("Server URL", server_url)
-
         async with self.session.post(self.base_url + f"/messenger/v3/webhook", headers=headers,
                                      json=payload) as response:
             if response.status == 200:
