@@ -142,7 +142,7 @@ async def on_startup():
         # Get public address from env file
         server_url = Settings.server_url
     logger.info(f"Server URL: {server_url}")
-    dp_notifications["server_url"] = server_url + ":8080" + API_ENDPOINT
+    dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
     try:
