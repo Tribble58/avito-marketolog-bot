@@ -137,10 +137,11 @@ async def on_startup():
         time.sleep(3)  # wait for ngrok to run up
 
         # Get public address and put it to notification bot
-        server_url = await get_ngrok_url() if Settings.server_url is None else Settings.server_url
+        server_url = await get_ngrok_url()
     else:
-        # Get public adress from env file
+        # Get public address from env file
         server_url = Settings.server_url
+    logger.info(f"Server URL: {server_url}")
     dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
