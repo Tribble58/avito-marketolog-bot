@@ -1,7 +1,7 @@
 import logging
 import subprocess
 import time
-from multiprocessing.managers import Server
+from signal import SIGTERM
 
 import aiohttp
 import uvicorn
@@ -151,7 +151,7 @@ async def on_startup():
             dp_notifications.start_polling(tg_bot_notifications),
             run_fastapi(app)
         )
-    except (asyncio.CancelledError, KeyboardInterrupt):
+    except (asyncio.CancelledError, KeyboardInterrupt, SIGTERM):
         logger.info("Shutdown commenced...")
     finally:
         await db.close()
