@@ -223,7 +223,6 @@ class Database:
         """
         session = await self.get_session()
         user_id = select(Account.user_id).where(Account.avito_id == avito_id).scalar_subquery()
-        logger.debug(f"user_id: {user_id}")
         result = await session.execute(
             select(User.tg_id)
             .select_from(User)
