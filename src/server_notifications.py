@@ -18,6 +18,7 @@ def setup_server(tg_bot_notifications: Bot):
     """
     app = FastAPI()
     db = Database()
+
     @app.post(API_ENDPOINT)
     async def avito_webhook(request: Request):
         global tg_id
@@ -29,22 +30,30 @@ def setup_server(tg_bot_notifications: Bot):
         # Log data
         logger.info(f"Получено уведомление от Авито: {data}")
 
-        avito_id = data["payload"]["value"]["user_id"]
+        user_id = data["payload"]["value"]["user_id"]
+        author_id = data["payload"]["value"]["author_id"]
+
         message = data["payload"]["value"]["content"]["text"]
 
-        logger.debug(f"Сообщение для пользователя {avito_id}: {message}")
-        logger.debug(f"tg_id: {tg_id}")
+        # Skip messages that were sent by owner of the account
+        if user_id != author_id:
+            logger.debug(f"Сообщение для пользователя {user_id}: {message}")
+            logger.debug(f"tg_id: {tg_id}")
 
-        if tg_id is None:
-            tg_id = await db.get_tg_id_by_account(avito_id=avito_id) #TODO: если у двух юзеров есть один аккаунт, то будет ошибка
-            logger.debug(f"Идентификатор пользователя в Телеграм получен!")
+            if tg_id is None:
+                tg_id = await db.get_tg_id_by_account(
+                    avito_id=user_id)  # TODO: если у двух юзеров есть один аккаунт, то будет ошибка
+                logger.debug(f"Идентификатор пользователя в Телеграм получен!")
 
-        if tg_id is not None:
-            try:
-                await tg_bot_notifications.send_message(chat_id=tg_id, text=f"📨 Новое сообщение от клиента Авито!\n\n{message}")
-            except Exception as e:
-                print(f"Ошибка при отправке сообщения: {e}")
+            if tg_id is not None:
+                try:
+                    await tg_bot_notifications.send_message(chat_id=tg_id,
+                                                            text=f"📨 Новое сообщение от клиента Авито!\n\n{message}")
+                except Exception as e:
+                    print(f"Ошибка при отправке сообщения: {e}")
+            else:
+                logger.warning(f"Аккаунт {user_id} не подключен ни к одному пользователю!")
         else:
-            logger.warning(f"Аккаунт {avito_id} не подключен ни к одному пользователю!")
+            logger.info(f"Сообщение пользователя аккаунта : {data}")
 
     return app
