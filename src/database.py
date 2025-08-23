@@ -4,8 +4,8 @@ from typing import Tuple, List
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from src.config import Settings
-from src.models import Base, User, UserTemplate, Account
+from config import Settings
+from models import Base, User, UserTemplate, Account
 
 logger = logging.getLogger(__name__)
 
@@ -215,22 +215,25 @@ class Database:
         secrets = result.one_or_none()
         return secrets
 
-    async def get_tg_id_by_account(self, avito_id: int) -> int | None:
+    async def get_tg_id_by_account(self, avito_id: int) -> list | None:
         """
-        Gets id of user in Telegram by user`s client
+        Gets id of user in Telegram by user`s client. If multiple users have one account, return that multiple users
         :param avito_id:
-        :return: tg_id:
+        :return: tg_ids:
         """
         session = await self.get_session()
-        user_id = select(Account.user_id).where(Account.avito_id == avito_id).scalar_subquery()
-        logger.debug(f"user_id: {user_id}")
+        users_subq = select(Account.user_id).where(Account.avito_id == avito_id).subquery()
         result = await session.execute(
             select(User.tg_id)
             .select_from(User)
-            .where(User.id == user_id)
+            .where(
+                User.id.in_(
+                    select(Account.user_id).where(Account.avito_id == avito_id)
+                )
+            )
         )
-        tg_id = result.scalar_one_or_none()
-        return tg_id
+        tg_ids = result.all()
+        return tg_ids
 
     async def get_templates(self, tg_id: int) -> List[Tuple[str, int]]:
         """

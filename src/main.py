@@ -1,19 +1,20 @@
 import logging
 import subprocess
 import time
+from signal import SIGTERM
 
 import aiohttp
 import uvicorn
 from aiogram.types import BotCommand
 
+from bot import router
 from middlewares import AvitoInnerMiddleware
+from middlewares import DbOuterMiddleware
 from routers.accounts_manager import accounts_manager_router
 from routers.chat_manager import chat_manager_router, avito_service_router
-from routers.templates_editor import templates_editor_router
 from routers.notifications import notifications_router
-from src.bot import router
-from src.middlewares import DbOuterMiddleware
-from src.server_notifications import setup_server, API_ENDPOINT
+from routers.templates_editor import templates_editor_router
+from server_notifications import setup_server, API_ENDPOINT
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.DEBUG,
@@ -23,10 +24,8 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 from aiogram import Bot, Dispatcher
-
-from src.config import Settings
-
-from src.database import Database
+from config import Settings
+from database import Database
 
 db = Database()
 
@@ -132,12 +131,17 @@ async def on_startup():
     # Run server with message sending functionality
     app = setup_server(tg_bot_notifications=tg_bot_notifications)
 
-    # Run ngrok for port forwarding
-    ngrok = subprocess.Popen(["ngrok", "http", "8080"])
-    time.sleep(3) # wait for ngrok to run up
+    if Settings.server_url is None:
+        # Run ngrok for port forwarding
+        ngrok = subprocess.Popen(["ngrok", "http", "8080"])
+        time.sleep(3)  # wait for ngrok to run up
 
-    # Get public address and put it to notification bot
-    server_url = await get_ngrok_url()
+        # Get public address and put it to notification bot
+        server_url = await get_ngrok_url()
+    else:
+        # Get public address from env file
+        server_url = Settings.server_url
+    logger.info(f"Server URL: {server_url}")
     dp_notifications["server_url"] = server_url + API_ENDPOINT
 
     # Run everything
@@ -147,7 +151,7 @@ async def on_startup():
             dp_notifications.start_polling(tg_bot_notifications),
             run_fastapi(app)
         )
-    except (asyncio.CancelledError, KeyboardInterrupt):
+    except (asyncio.CancelledError, KeyboardInterrupt, SIGTERM):
         logger.info("Shutdown commenced...")
     finally:
         await db.close()

@@ -1,10 +1,8 @@
 import logging
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy.exc import IntegrityError
 
-from callbacks import TemplatesCallbackFactory
-from src.database import Database
+from database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +11,9 @@ from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message, ErrorEvent
 
-from src.avito import AvitoAccount
-from src.config import ReplyState
-from src.callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplateTextCallbackFactory, \
+from avito import AvitoAccount
+from config import ReplyState
+from callbacks import ChatsCallbackFactory, MessagesCallbackFactory, TemplateTextCallbackFactory, \
     AccountsChatsCallbackFactory
 
 """

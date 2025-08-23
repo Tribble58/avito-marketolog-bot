@@ -14,6 +14,7 @@ class Settings:
     """
     client_id: str = os.getenv("AVITO_CLIENT_ID")
     client_secret: str = os.getenv("AVITO_CLIENT_SECRET")
+    server_url: str = os.getenv("SERVER_URL")
     bot_token: str = os.getenv("TG_BOT_TOKEN")
     notifications_bot_token: str = os.getenv("TG_BOT_NOTIFICATIONS_TOKEN")
     db_host: str = os.getenv("PG_HOST")
