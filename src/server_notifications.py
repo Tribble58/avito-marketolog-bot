@@ -40,17 +40,21 @@ def setup_server(tg_bot_notifications: Bot):
             logger.debug(f"Сообщение для пользователя {user_id}: {message}")
             logger.debug(f"tg_id: {tg_id}")
 
+            # Get id of user whom notification needs to be sent to. If there are multiple users that manage one
+            # account, iterate and send notification to each of them
+
             if tg_id is None:
-                tg_id = await db.get_tg_id_by_account(
-                    avito_id=user_id)  # TODO: если у двух юзеров есть один аккаунт, то будет ошибка
+                tg_id = await db.get_tg_id_by_account(avito_id=user_id)
                 logger.debug(f"Идентификатор пользователя в Телеграм получен!")
 
             if tg_id is not None:
                 try:
-                    await tg_bot_notifications.send_message(chat_id=tg_id,
-                                                            text=f"📨 Новое сообщение от клиента Авито!\n\n{message}")
+                    for (chat_id,) in tg_id:
+                        await tg_bot_notifications.send_message(chat_id=chat_id,
+                                                                text=f"📨 Новое сообщение от клиента Авито!\n\n{message}")
+                        logger.info(f"Сообщение пользователя аккаунта : {chat_id}")
                 except Exception as e:
-                    print(f"Ошибка при отправке сообщения: {e}")
+                    logger.error(f"Ошибка при отправке сообщения: {e}")
             else:
                 logger.warning(f"Аккаунт {user_id} не подключен ни к одному пользователю!")
         else:
