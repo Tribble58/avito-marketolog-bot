@@ -21,6 +21,7 @@ Router implements logic regarding accounts: connection, disconnection, update, e
 
 accounts_manager_router = Router()
 
+# TODO: add check account before adding
 
 @accounts_manager_router.message(Command("accounts_manager"))
 async def accounts_manager(message: Message):
